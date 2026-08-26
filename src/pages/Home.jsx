@@ -194,7 +194,7 @@ export default function Home() {
                 <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
                 <li>• Standard chess rules apply on a 9-wide board.</li>
                 <li>
-                  • <span className="font-medium text-stone-800">Truth</span> (♚ with a blue dot) moves like a
+                  • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
                   King — one square any direction — can only capture the opposing King, and can never be
                   captured.
                 </li>

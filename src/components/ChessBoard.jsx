@@ -3,6 +3,21 @@ import React from 'react';
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
 
+function Cross({ color }) {
+  const fill = color === 'w' ? '#f8fafc' : '#1f2937';
+  const stroke = color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)';
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-[55%] h-[55%]"
+      style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
+    >
+      <rect x="10" y="2" width="4" height="20" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
+    </svg>
+  );
+}
+
 export default function ChessBoard({ board, selected, legalMoves, lastMove, onSquareClick }) {
   const destSet = new Set(legalMoves.map((m) => `${m.to[0]},${m.to[1]}`));
   const selKey = selected ? `${selected[0]},${selected[1]}` : null;
@@ -32,24 +47,24 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
                   isSel ? 'bg-amber-300/90' : '',
                 ].join(' ')}
               >
-                {piece && (
-                  <span
-                    className="relative leading-none"
-                    style={{
-                      fontSize: 'min(8.5vw, 2.7rem)',
-                      color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
-                      textShadow:
-                        piece.color === 'w'
-                          ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
-                          : '0 1px 1px rgba(255,255,255,0.25)',
-                    }}
-                  >
-                    {GLYPHS[piece.type]}
-                  </span>
-                )}
-                {piece && piece.type === 'T' && (
-                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white shadow-sm" title="Truth — cannot be captured" />
-                )}
+                {piece &&
+                  (piece.type === 'T' ? (
+                    <Cross color={piece.color} />
+                  ) : (
+                    <span
+                      className="relative leading-none"
+                      style={{
+                        fontSize: 'min(8.5vw, 2.7rem)',
+                        color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
+                        textShadow:
+                          piece.color === 'w'
+                            ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
+                            : '0 1px 1px rgba(255,255,255,0.25)',
+                      }}
+                    >
+                      {GLYPHS[piece.type]}
+                    </span>
+                  ))}
                 {isDest && !piece && <span className="absolute w-1/3 h-1/3 rounded-full bg-emerald-600/40" />}
                 {isDest && piece && (
                   <span className="absolute inset-1 rounded-full ring-2 ring-emerald-600/60" />
