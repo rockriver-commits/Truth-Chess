@@ -1,11 +1,12 @@
 // Chancellor Chess — a 9x8 chess variant.
-// An extra piece, the Chancellor (C), sits between the Queen and King on the back rank,
-// with a pawn in front of it. The Chancellor moves like a Rook or a Knight.
+// An extra piece, the Hunter (H), sits between the Queen and King on the back rank,
+// with a pawn in front of it. The Hunter moves like a King (one square in any direction)
+// and can only capture the opposing King — it cannot take any other piece.
 
 export const FILES = 9;
 export const RANKS = 8;
 
-const BACK = ['R', 'N', 'B', 'Q', 'C', 'K', 'B', 'N', 'R'];
+const BACK = ['R', 'N', 'B', 'Q', 'H', 'K', 'B', 'N', 'R'];
 
 export function initialBoard() {
   const board = Array.from({ length: RANKS }, () => Array(FILES).fill(null));
@@ -134,10 +135,17 @@ function pieceMoves(board, r, f) {
       slide(ROOK_DIRS);
       slide(BISHOP_DIRS);
       break;
-    case 'C':
-      slide(ROOK_DIRS);
-      jumps(KNIGHT_OFFSETS);
+    case 'H': {
+      for (const [dr, df] of KING_OFFSETS) {
+        const tr = r + dr;
+        const tf = f + df;
+        if (!inBounds(tr, tf)) continue;
+        const t = board[tr][tf];
+        if (!t) add(tr, tf);
+        else if (t.color !== color && t.type === 'K') add(tr, tf, { captured: t });
+      }
       break;
+    }
     case 'K':
       jumps(KING_OFFSETS);
       break;
@@ -161,7 +169,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     const tf = f + df;
     if (inBounds(tr, tf)) {
       const t = board[tr][tf];
-      if (t && t.color === byColor && (t.type === 'N' || t.type === 'C')) return true;
+      if (t && t.color === byColor && t.type === 'N') return true;
     }
   }
   for (const [dr, df] of KING_OFFSETS) {
@@ -169,7 +177,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     const tf = f + df;
     if (inBounds(tr, tf)) {
       const t = board[tr][tf];
-      if (t && t.color === byColor && t.type === 'K') return true;
+      if (t && t.color === byColor && (t.type === 'K' || t.type === 'H')) return true;
     }
   }
   for (const [dr, df] of ROOK_DIRS) {
@@ -178,7 +186,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     while (inBounds(tr, tf)) {
       const t = board[tr][tf];
       if (t) {
-        if (t.color === byColor && (t.type === 'R' || t.type === 'Q' || t.type === 'C')) return true;
+        if (t.color === byColor && (t.type === 'R' || t.type === 'Q')) return true;
         break;
       }
       tr += dr;
