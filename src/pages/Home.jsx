@@ -8,7 +8,7 @@ import {
 } from '@/lib/chessVariant';
 import { Button } from '@/components/ui/button';
 
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', H: '♚' };
+const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
 export default function Home() {
   const [board, setBoard] = useState(initialBoard);
@@ -92,12 +92,12 @@ export default function Home() {
             A Chess Variant
           </p>
           <h1 className="mt-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800">
-            Hunter Chess
+            Truth Chess
           </h1>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
-            A 9×8 board with a new piece — the <span className="font-medium text-stone-700">Hunter</span> —
-            placed between the King and Queen, and a pawn in front of it. The Hunter moves like a King
-            and can only capture the opposing King.
+            A 9×8 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
+            placed between the King and Queen, and a pawn in front of it. Truth moves like a King,
+            can only capture the opposing King, and cannot be captured by any piece.
           </p>
         </header>
 
@@ -148,8 +148,9 @@ export default function Home() {
                 <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
                 <li>• Standard chess rules apply on a 9-wide board.</li>
                 <li>
-                  • The <span className="font-medium text-stone-800">Hunter</span> (♚ with a red dot) moves
-                  like a King — one square any direction — and can only capture the opposing King.
+                  • <span className="font-medium text-stone-800">Truth</span> (♚ with a blue dot) moves like a
+                  King — one square any direction — can only capture the opposing King, and can never be
+                  captured.
                 </li>
                 <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
               </ul>

@@ -1,12 +1,12 @@
 // Chancellor Chess — a 9x8 chess variant.
-// An extra piece, the Hunter (H), sits between the Queen and King on the back rank,
-// with a pawn in front of it. The Hunter moves like a King (one square in any direction)
-// and can only capture the opposing King — it cannot take any other piece.
+// An extra piece, the Truth (T), sits between the Queen and King on the back rank,
+// with a pawn in front of it. Truth moves like a King (one square in any direction),
+// can only capture the opposing King, and cannot be captured by any piece.
 
 export const FILES = 9;
 export const RANKS = 8;
 
-const BACK = ['R', 'N', 'B', 'Q', 'H', 'K', 'B', 'N', 'R'];
+const BACK = ['R', 'N', 'B', 'Q', 'T', 'K', 'B', 'N', 'R'];
 
 export function initialBoard() {
   const board = Array.from({ length: RANKS }, () => Array(FILES).fill(null));
@@ -75,8 +75,10 @@ function pieceMoves(board, r, f) {
         const t = board[tr][tf];
         if (!t) {
           add(tr, tf);
+        } else if (t.color === color || t.type === 'T') {
+          break; // blocked by own piece or the uncapturable Truth
         } else {
-          if (t.color !== color) add(tr, tf, { captured: t });
+          add(tr, tf, { captured: t });
           break;
         }
         tr += dr;
@@ -89,10 +91,10 @@ function pieceMoves(board, r, f) {
     for (const [dr, df] of offsets) {
       const tr = r + dr;
       const tf = f + df;
-      if (inBounds(tr, tf)) {
-        const t = board[tr][tf];
-        if (!t || t.color !== color) add(tr, tf, t ? { captured: t } : {});
-      }
+      if (!inBounds(tr, tf)) continue;
+      const t = board[tr][tf];
+      if (!t) add(tr, tf);
+      else if (t.color !== color && t.type !== 'T') add(tr, tf, { captured: t });
     }
   };
 
@@ -114,7 +116,7 @@ function pieceMoves(board, r, f) {
         const tf = f + df;
         if (inBounds(tr, tf)) {
           const t = board[tr][tf];
-          if (t && t.color !== color) {
+          if (t && t.color !== color && t.type !== 'T') {
             if (tr === promoRank) add(tr, tf, { captured: t, promotion: true });
             else add(tr, tf, { captured: t });
           }
@@ -135,7 +137,7 @@ function pieceMoves(board, r, f) {
       slide(ROOK_DIRS);
       slide(BISHOP_DIRS);
       break;
-    case 'H': {
+    case 'T': {
       for (const [dr, df] of KING_OFFSETS) {
         const tr = r + dr;
         const tf = f + df;
@@ -177,7 +179,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     const tf = f + df;
     if (inBounds(tr, tf)) {
       const t = board[tr][tf];
-      if (t && t.color === byColor && (t.type === 'K' || t.type === 'H')) return true;
+      if (t && t.color === byColor && (t.type === 'K' || t.type === 'T')) return true;
     }
   }
   for (const [dr, df] of ROOK_DIRS) {

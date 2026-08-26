@@ -1,6 +1,6 @@
 import React from 'react';
 
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', H: '♚' };
+const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
 
 export default function ChessBoard({ board, selected, legalMoves, lastMove, onSquareClick }) {
@@ -47,8 +47,8 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
                     {GLYPHS[piece.type]}
                   </span>
                 )}
-                {piece && piece.type === 'H' && (
-                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white shadow-sm" title="Hunter" />
+                {piece && piece.type === 'T' && (
+                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white shadow-sm" title="Truth — cannot be captured" />
                 )}
                 {isDest && !piece && <span className="absolute w-1/3 h-1/3 rounded-full bg-emerald-600/40" />}
                 {isDest && piece && (
