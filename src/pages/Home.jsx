@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import ChessBoard from '@/components/ChessBoard';
 import {
   initialBoard,
@@ -6,6 +6,7 @@ import {
   gameStatus,
   makeMove,
 } from '@/lib/chessVariant';
+import { bestMove } from '@/lib/chessAI';
 import { Button } from '@/components/ui/button';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
@@ -18,12 +19,15 @@ export default function Home() {
   const [captured, setCaptured] = useState({ w: [], b: [] });
   const [lastMove, setLastMove] = useState(null);
   const [promo, setPromo] = useState(null);
+  const [vsComputer, setVsComputer] = useState(false);
+  const [thinking, setThinking] = useState(false);
 
   const status = useMemo(() => gameStatus(board, turn), [board, turn]);
   const gameOver = status === 'checkmate' || status === 'stalemate';
 
   function handleSquareClick(r, f) {
     if (gameOver || promo) return;
+    if (vsComputer && turn === 'b') return;
     const piece = board[r][f];
     if (selected) {
       const move = legalMoves.find((m) => m.to[0] === r && m.to[1] === f);
@@ -75,14 +79,36 @@ export default function Home() {
     setCaptured({ w: [], b: [] });
     setLastMove(null);
     setPromo(null);
+    setThinking(false);
   }
 
-  const statusText = {
+  useEffect(() => {
+    if (!vsComputer || turn !== 'b' || gameOver || promo) return;
+    setThinking(true);
+    const t = setTimeout(() => {
+      const move = bestMove(board, 'b', 2);
+      if (move) commitMove(move, 'Q');
+      setThinking(false);
+    }, 350);
+    return () => {
+      clearTimeout(t);
+      setThinking(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vsComputer, turn, gameOver, promo, board]);
+
+  function setMode(computer) {
+    setVsComputer(computer);
+    reset();
+  }
+
+  let statusText = {
     playing: `${turn === 'w' ? 'White' : 'Black'} to move`,
     check: `${turn === 'w' ? 'White' : 'Black'} is in check`,
     checkmate: `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`,
     stalemate: 'Stalemate — draw',
   }[status];
+  if (thinking) statusText = 'Computer is thinking…';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">
@@ -118,6 +144,26 @@ export default function Home() {
 
           <aside className="space-y-5">
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 rounded-xl mb-4">
+                <button
+                  type="button"
+                  onClick={() => setMode(false)}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    !vsComputer ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  2 Players
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode(true)}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    vsComputer ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  vs Computer
+                </button>
+              </div>
               <div className="flex items-center gap-3">
                 <span
                   className={`inline-block w-3 h-3 rounded-full ${
