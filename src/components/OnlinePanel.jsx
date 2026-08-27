@@ -25,6 +25,9 @@ export default function OnlinePanel({
   onWatch,
   onLeave,
   onResign,
+  onOfferDraw,
+  onAcceptDraw,
+  onDeclineDraw,
 }) {
   const [code, setCode] = useState('');
 
@@ -179,8 +182,20 @@ export default function OnlinePanel({
           <span className="text-xs text-stone-400">You: {youAre}</span>
         </div>
         <p className="text-[0.65rem] uppercase tracking-widest text-stone-400">Code: {onlineGame.code}</p>
-        {!spectator && onlineGame.status === 'active' && (
-          <Button onClick={onResign} variant="outline" className="w-full">Resign</Button>
+        {onlineGame.status === 'active' && !spectator && (
+          onlineGame.draw_offer_by && onlineGame.draw_offer_by !== myColor ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" onClick={onAcceptDraw}>Accept Draw</Button>
+              <Button size="sm" variant="outline" onClick={onDeclineDraw}>Decline</Button>
+            </div>
+          ) : onlineGame.draw_offer_by === myColor ? (
+            <p className="text-xs text-stone-500 text-center py-1">Draw offered — waiting for response…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={onResign} variant="outline">Resign</Button>
+              <Button onClick={onOfferDraw} variant="outline">Offer Draw</Button>
+            </div>
+          )
         )}
         <Button onClick={onLeave} variant="outline" className="w-full">
           {spectator ? 'Stop spectating' : 'Leave'}

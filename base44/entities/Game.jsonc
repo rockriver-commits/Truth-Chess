@@ -85,6 +85,13 @@
         "draw"
       ]
     },
+    "draw_offer_by": {
+      "type": "string",
+      "enum": [
+        "w",
+        "b"
+      ]
+    },
     "last_move_at": {
       "type": "string",
       "format": "date-time"

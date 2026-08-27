@@ -75,6 +75,7 @@ export default function Home() {
   const [whiteClock, setWhiteClock] = useState(null);
   const [blackClock, setBlackClock] = useState(null);
   const [timedOut, setTimedOut] = useState(null);
+  const [animateMove, setAnimateMove] = useState(null);
 
   useEffect(() => localStorage.setItem('tc-board-theme', boardTheme), [boardTheme]);
   useEffect(() => localStorage.setItem('tc-piece-style', pieceStyle), [pieceStyle]);
@@ -265,6 +266,7 @@ export default function Home() {
       if (localState.turn === 'w') setWhiteClock((c) => (c ?? 0) + inc);
       else setBlackClock((c) => (c ?? 0) + inc);
     }
+    setAnimateMove({ from: move.from, to: move.to, piece: move.piece, color: localState.turn, key: Date.now() });
     setLocalState(ns);
     setLocalLastMove(move);
     setSelected(null);
@@ -444,7 +446,7 @@ export default function Home() {
       const newMoves = [...(onlineGame.moves || []), stored];
       const { state: ns } = replayGame(newMoves);
       const st = gameStatus(ns);
-      const patch = { moves: newMoves, last_move_at: new Date().toISOString() };
+      const patch = { moves: newMoves, last_move_at: new Date().toISOString(), draw_offer_by: null };
       if (st === 'checkmate') {
         patch.status = 'finished';
         patch.result = ns.turn === 'w' ? 'black_wins' : 'white_wins';
@@ -499,6 +501,40 @@ export default function Home() {
       setOnlineGame(updated);
     } catch (e) {
       setOnlineError('Could not resign.');
+    }
+  }
+
+  async function offerDrawOnline() {
+    if (!onlineGame || onlineGame.status !== 'active' || !myColor) return;
+    try {
+      const updated = await base44.entities.Game.update(onlineGame.id, { draw_offer_by: myColor });
+      setOnlineGame(updated);
+    } catch {
+      setOnlineError('Could not offer draw.');
+    }
+  }
+
+  async function acceptDrawOnline() {
+    if (!onlineGame || onlineGame.status !== 'active') return;
+    try {
+      const updated = await base44.entities.Game.update(onlineGame.id, {
+        status: 'finished',
+        result: 'draw',
+        draw_offer_by: null,
+      });
+      setOnlineGame(updated);
+    } catch {
+      setOnlineError('Could not accept draw.');
+    }
+  }
+
+  async function declineDrawOnline() {
+    if (!onlineGame) return;
+    try {
+      const updated = await base44.entities.Game.update(onlineGame.id, { draw_offer_by: null });
+      setOnlineGame(updated);
+    } catch {
+      setOnlineError('Could not decline draw.');
     }
   }
 
@@ -618,6 +654,15 @@ export default function Home() {
         if (newLen > prevMovesLen.current) {
           const kind = classifyMove(event.data.moves);
           playSound(kind === 'mate' || kind === 'stale' ? 'mate' : kind);
+          const lastMv = event.data.moves[newLen - 1];
+          try {
+            const pre = replayStates(event.data.moves.slice(0, -1));
+            const preState = pre[pre.length - 1].state;
+            const pc = preState.board[lastMv.from[0]][lastMv.from[1]];
+            if (pc) setAnimateMove({ from: lastMv.from, to: lastMv.to, piece: pc, color: pc.color, key: Date.now() });
+          } catch {
+            // ignore animation failure
+          }
           prevMovesLen.current = newLen;
         }
         setOnlineGame(event.data);
@@ -835,6 +880,7 @@ export default function Home() {
                     lastMove={viewLastMove}
                     onSquareClick={handleSquareClick}
                     onDropMove={handleDropMove}
+                    animateMove={animateMove}
                     flipped={effectiveFlipped}
                     checkSquare={viewCheck}
                     hintMove={reviewing ? null : hint}
@@ -1054,6 +1100,9 @@ export default function Home() {
                 onWatch={watchGame}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
+                onOfferDraw={offerDrawOnline}
+                onAcceptDraw={acceptDrawOnline}
+                onDeclineDraw={declineDrawOnline}
               />
             )}
 
