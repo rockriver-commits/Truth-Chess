@@ -7,6 +7,15 @@
         "admin",
         "user"
       ]
+    },
+    "plan": {
+      "type": "string",
+      "description": "Subscription tier: 'pro' unlocks full AI levels and unlimited online play.",
+      "enum": [
+        "free",
+        "pro"
+      ],
+      "default": "free"
     }
   },
   "required": [

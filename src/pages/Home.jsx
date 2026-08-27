@@ -76,6 +76,8 @@ export default function Home() {
   const [blackClock, setBlackClock] = useState(null);
   const [timedOut, setTimedOut] = useState(null);
   const [animateMove, setAnimateMove] = useState(null);
+  const [showPro, setShowPro] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => localStorage.setItem('tc-board-theme', boardTheme), [boardTheme]);
   useEffect(() => localStorage.setItem('tc-piece-style', pieceStyle), [pieceStyle]);
@@ -93,6 +95,13 @@ export default function Home() {
   useEffect(() => {
     base44.auth.me().then(setMe).catch(() => setMe(null));
   }, []);
+
+  const isPro = me?.plan === 'pro';
+
+  // Free users are capped at AI level 3; clamp if they lose Pro mid-session.
+  useEffect(() => {
+    if (!isPro && difficulty > 3) setDifficulty(3);
+  }, [isPro, difficulty]);
 
   const onlineDerived = useMemo(() => {
     if (mode !== 'online' || !onlineGame) return null;
@@ -377,6 +386,22 @@ export default function Home() {
     }
   }
 
+  // Free users get 3 online games/day; Pro is unlimited.
+  async function onlineQuotaRemaining() {
+    if (!me) return 0;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    try {
+      const [w, b] = await Promise.all([
+        base44.entities.Game.filter({ white_player_id: me.id, created_date: { $gte: start.toISOString() } }),
+        base44.entities.Game.filter({ black_player_id: me.id, created_date: { $gte: start.toISOString() } }),
+      ]);
+      return Math.max(0, 3 - ((w?.length || 0) + (b?.length || 0)));
+    } catch {
+      return 3;
+    }
+  }
+
   async function createOnline() {
     setOnlineError('');
     try {
@@ -384,6 +409,14 @@ export default function Home() {
       if (!user) {
         setOnlineError('Sign in to play online.');
         return;
+      }
+      if (!isPro) {
+        const rem = await onlineQuotaRemaining();
+        if (rem <= 0) {
+          setOnlineError('Daily free online limit reached — upgrade to Pro.');
+          setShowPro(true);
+          return;
+        }
       }
       const code = generateCode();
       const rec = await base44.entities.Game.create({
@@ -538,6 +571,21 @@ export default function Home() {
     }
   }
 
+  async function upgrade() {
+    setUpgrading(true);
+    try {
+      const res = await base44.functions.invoke('create-checkout', { productId: 'pro_monthly' });
+      if (res?.data?.redirectUrl) {
+        window.location.href = res.data.redirectUrl;
+        return;
+      }
+      setOnlineError('Could not start checkout.');
+    } catch {
+      setOnlineError('Could not start checkout.');
+    }
+    setUpgrading(false);
+  }
+
   async function refreshOpenGames() {
     try {
       const [waiting, active] = await Promise.all([
@@ -557,6 +605,14 @@ export default function Home() {
     if (!user) {
       setOnlineError('Sign in to play online.');
       return;
+    }
+    if (!isPro) {
+      const rem = await onlineQuotaRemaining();
+      if (rem <= 0) {
+        setOnlineError('Daily free online limit reached — upgrade to Pro.');
+        setShowPro(true);
+        return;
+      }
     }
     try {
       const open = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
@@ -918,10 +974,19 @@ export default function Home() {
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
-                {mode === 'online' || timeControl === 'unlimited' ? (
-                  <span className="text-xs font-mono text-stone-500">⏱ {fmtTime(elapsed)}</span>
-                ) : null}
+                <span className="text-xs font-medium text-amber-600">
+                  {isPro ? '⚡ Pro' : ''}
+                </span>
               </div>
+              {!isPro && (
+                <button
+                  type="button"
+                  onClick={() => setShowPro(true)}
+                  className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-medium py-2 shadow-sm hover:from-amber-600 hover:to-amber-700 transition"
+                >
+                  ⚡ Upgrade to Pro
+                </button>
+              )}
               {mode !== 'online' && (
                 <div>
                   <p className="text-[0.65rem] uppercase tracking-widest text-stone-400 mb-1">Time control</p>
@@ -1024,17 +1089,28 @@ export default function Home() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
-                    <span className="text-xs font-semibold text-stone-700">Level {difficulty}/8</span>
+                    <span className="text-xs font-semibold text-stone-700">
+                      Level {difficulty}/{isPro ? 8 : 3}
+                    </span>
                   </div>
                   <input
                     type="range"
                     min={1}
-                    max={8}
+                    max={isPro ? 8 : 3}
                     step={1}
                     value={difficulty}
                     onChange={(e) => setDifficulty(Number(e.target.value))}
                     className="w-full accent-amber-600"
                   />
+                  {!isPro && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPro(true)}
+                      className="mt-1 text-[0.7rem] text-amber-600 hover:underline"
+                    >
+                      🔒 Levels 4–8 are Pro — upgrade
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1130,6 +1206,35 @@ export default function Home() {
           <Leaderboard />
         </div>
       </div>
+
+      {showPro && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-lg font-semibold text-stone-800">⚡ Truth Chess Pro</p>
+              <button
+                type="button"
+                onClick={() => setShowPro(false)}
+                className="text-stone-400 hover:text-stone-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <ul className="space-y-2 text-sm text-stone-600 mb-4">
+              <li>• Unlock AI levels 4–8 for stronger play</li>
+              <li>• Unlimited online games (free: 3/day)</li>
+              <li>• Support ongoing development</li>
+            </ul>
+            <p className="text-sm font-medium text-stone-800 mb-3">$4.99/month · cancel anytime</p>
+            <Button onClick={upgrade} disabled={upgrading} className="w-full">
+              {upgrading ? 'Redirecting…' : 'Upgrade to Pro'}
+            </Button>
+            <p className="text-[0.65rem] text-stone-400 text-center mt-2">
+              Payment processed securely by Base44 Payments.
+            </p>
+          </div>
+        </div>
+      )}
 
       {promo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
