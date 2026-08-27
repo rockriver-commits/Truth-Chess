@@ -6,7 +6,7 @@ import {
   gameStatus,
   makeMove,
 } from '@/lib/chessVariant';
-import { bestMove } from '@/lib/chessAI';
+import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import { Button } from '@/components/ui/button';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
@@ -22,6 +22,9 @@ export default function Home() {
   const [promo, setPromo] = useState(null);
   const [vsComputer, setVsComputer] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [difficulty, setDifficulty] = useState(1);
+  const [history, setHistory] = useState([]);
+  const [pendingAdvance, setPendingAdvance] = useState(false);
 
   const status = useMemo(() => gameStatus(state), [state]);
   const gameOver = status === 'checkmate' || status === 'stalemate';
@@ -56,6 +59,7 @@ export default function Home() {
   }
 
   function commitMove(move, promoType) {
+    setHistory((h) => [...h, { state, captured, lastMove }]);
     if (move.captured) {
       setCaptured((c) => ({ ...c, [turn]: [...c[turn], move.captured] }));
     }
@@ -71,6 +75,18 @@ export default function Home() {
     commitMove(promo.move, type);
   }
 
+  function undo() {
+    if (!vsComputer || thinking || promo || gameOver) return;
+    if (history.length < 2) return;
+    const target = history[history.length - 2];
+    setHistory((h) => h.slice(0, h.length - 2));
+    setState(target.state);
+    setCaptured(target.captured);
+    setLastMove(target.lastMove);
+    setSelected(null);
+    setLegalMoves([]);
+  }
+
   function reset() {
     setState(initialState());
     setSelected(null);
@@ -79,13 +95,15 @@ export default function Home() {
     setLastMove(null);
     setPromo(null);
     setThinking(false);
+    setHistory([]);
+    setPendingAdvance(false);
   }
 
   useEffect(() => {
     if (!vsComputer || turn !== 'b' || gameOver || promo) return;
     setThinking(true);
     const t = setTimeout(() => {
-      const move = bestMove(state, 'b', 2);
+      const move = bestMove(state, 'b', difficulty);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 350);
@@ -94,7 +112,23 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vsComputer, gameOver, promo, state]);
+  }, [vsComputer, gameOver, promo, state, difficulty]);
+
+  useEffect(() => {
+    if (vsComputer && status === 'checkmate' && turn === 'b' && difficulty < 8) {
+      setPendingAdvance(true);
+    }
+  }, [status, turn, vsComputer, difficulty]);
+
+  function advance() {
+    setDifficulty((d) => Math.min(8, d + 1));
+    setPendingAdvance(false);
+    reset();
+  }
+
+  function stay() {
+    setPendingAdvance(false);
+  }
 
   function setMode(computer) {
     setVsComputer(computer);
@@ -163,6 +197,23 @@ export default function Home() {
                   vs Computer
                 </button>
               </div>
+              {vsComputer && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
+                    <span className="text-xs font-semibold text-stone-700">Level {difficulty}/8</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={8}
+                    step={1}
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(Number(e.target.value))}
+                    className="w-full accent-amber-600"
+                  />
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <span
                   className={`inline-block w-3 h-3 rounded-full ${
@@ -182,9 +233,24 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              <Button onClick={reset} variant="outline" className="mt-4 w-full">
-                New Game
-              </Button>
+              {vsComputer ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={undo}
+                    variant="outline"
+                    disabled={thinking || history.length < 2 || gameOver || promo}
+                  >
+                    Undo
+                  </Button>
+                  <Button onClick={reset} variant="outline">
+                    New Game
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={reset} variant="outline" className="mt-4 w-full">
+                  New Game
+                </Button>
+              )}
             </div>
 
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
@@ -233,6 +299,19 @@ export default function Home() {
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[300px] text-center">
+            <p className="text-lg font-semibold text-stone-800">You beat Level {difficulty}!</p>
+            <p className="text-sm text-stone-500 mt-1 mb-4">Advance to the next difficulty?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={stay} variant="outline">Stay</Button>
+              <Button onClick={advance}>Level {Math.min(8, difficulty + 1)}</Button>
             </div>
           </div>
         </div>
