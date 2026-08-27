@@ -11,6 +11,7 @@ import { generateCode, replayGame, serializeMove } from '@/lib/onlineGame';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import OnlinePanel from '@/components/OnlinePanel';
+import Leaderboard from '@/components/Leaderboard';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -641,6 +642,10 @@ export default function Home() {
               </div>
             )}
           </aside>
+        </div>
+
+        <div className="mt-8">
+          <Leaderboard />
         </div>
       </div>
 
