@@ -121,9 +121,9 @@ export default function Home() {
             Truth Chess
           </h1>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
-            A 9×8 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
-            placed between the King and Queen, and a pawn in front of it. Truth moves like a King,
-            can only capture the opposing King, and cannot be captured by any piece.
+            A 10×8 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
+            flanking the Queen and King, with a pawn in front of every piece. Truth moves like a Queen,
+            cannot capture any piece, and cannot be captured — a passive blocker.
           </p>
         </header>
 
@@ -192,11 +192,11 @@ export default function Home() {
               <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
               <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                 <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
-                <li>• Standard chess rules apply on a 9-wide board.</li>
+                <li>• Standard chess rules apply on a 10-wide board.</li>
                 <li>
                   • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
-                  King — one square any direction — can only capture the opposing King, and can never be
-                  captured.
+                  Queen but cannot capture any piece, and can never be captured — it acts as a passive
+                  blocker.
                 </li>
                 <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
               </ul>

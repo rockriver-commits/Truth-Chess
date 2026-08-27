@@ -1,7 +1,7 @@
 import React from 'react';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
-const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 
 function Cross({ color }) {
   const fill = color === 'w' ? '#f8fafc' : '#1f2937';
@@ -27,7 +27,7 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
 
   return (
     <div className="w-full max-w-[620px] mx-auto select-none">
-      <div className="grid grid-cols-9 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 bg-stone-100">
+      <div className="grid grid-cols-10 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 bg-stone-100">
         {board.map((row, r) =>
           row.map((piece, f) => {
             const dark = (r + f) % 2 === 1;
@@ -54,7 +54,7 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
                     <span
                       className="relative leading-none"
                       style={{
-                        fontSize: 'min(8.5vw, 2.7rem)',
+                        fontSize: 'min(7.8vw, 2.5rem)',
                         color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
                         textShadow:
                           piece.color === 'w'
@@ -74,7 +74,7 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
           })
         )}
       </div>
-      <div className="grid grid-cols-9 mt-1.5">
+      <div className="grid grid-cols-10 mt-1.5">
         {FILES.map((fl) => (
           <div key={fl} className="text-center text-[0.6rem] uppercase tracking-widest text-stone-400">
             {fl}

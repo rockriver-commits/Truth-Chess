@@ -3,10 +3,10 @@
 // with a pawn in front of it. Truth moves like a King (one square in any direction),
 // can only capture the opposing King, and cannot be captured by any piece.
 
-export const FILES = 9;
+export const FILES = 10;
 export const RANKS = 8;
 
-const BACK = ['R', 'N', 'B', 'Q', 'T', 'K', 'B', 'N', 'R'];
+const BACK = ['R', 'N', 'B', 'T', 'Q', 'K', 'T', 'B', 'N', 'R'];
 
 export function initialBoard() {
   const board = Array.from({ length: RANKS }, () => Array(FILES).fill(null));
@@ -138,13 +138,18 @@ function pieceMoves(board, r, f) {
       slide(BISHOP_DIRS);
       break;
     case 'T': {
-      for (const [dr, df] of KING_OFFSETS) {
-        const tr = r + dr;
-        const tf = f + df;
-        if (!inBounds(tr, tf)) continue;
-        const t = board[tr][tf];
-        if (!t) add(tr, tf);
-        else if (t.color !== color && t.type === 'K') add(tr, tf, { captured: t });
+      for (const dirs of [ROOK_DIRS, BISHOP_DIRS]) {
+        for (const [dr, df] of dirs) {
+          let tr = r + dr;
+          let tf = f + df;
+          while (inBounds(tr, tf)) {
+            const t = board[tr][tf];
+            if (!t) add(tr, tf);
+            else break; // blocked by any piece — Truth never captures
+            tr += dr;
+            tf += df;
+          }
+        }
       }
       break;
     }
@@ -179,7 +184,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     const tf = f + df;
     if (inBounds(tr, tf)) {
       const t = board[tr][tf];
-      if (t && t.color === byColor && (t.type === 'K' || t.type === 'T')) return true;
+      if (t && t.color === byColor && t.type === 'K') return true;
     }
   }
   for (const [dr, df] of ROOK_DIRS) {
