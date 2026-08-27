@@ -1225,7 +1225,7 @@ export default function Home() {
               <li>• Unlimited online games (free: 3/day)</li>
               <li>• Support ongoing development</li>
             </ul>
-            <p className="text-sm font-medium text-stone-800 mb-3">$4.99/month · cancel anytime</p>
+            <p className="text-sm font-medium text-stone-800 mb-3">$2.99/month · cancel anytime</p>
             <Button onClick={upgrade} disabled={upgrading} className="w-full">
               {upgrading ? 'Redirecting…' : 'Upgrade to Pro'}
             </Button>

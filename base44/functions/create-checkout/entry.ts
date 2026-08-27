@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
     const PRODUCTS: Record<string, { name: string; price: string; currency: string; frequency?: "MONTH" }> = {
       pro_monthly: {
         name: "Truth Chess Pro — Monthly",
-        price: "4.99",
+        price: "2.99",
         currency: "USD",
         frequency: "MONTH",
       },
