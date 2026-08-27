@@ -17,6 +17,7 @@ export default function OnlinePanel({
   onJoinCode,
   onJoinGame,
   onReenterOwn,
+  onStartGhost,
   onLeave,
   onResign,
 }) {
@@ -100,6 +101,22 @@ export default function OnlinePanel({
               Join
             </Button>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="h-px bg-stone-200 flex-1" />
+          <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">test</span>
+          <div className="h-px bg-stone-200 flex-1" />
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-xs uppercase tracking-widest text-stone-400">Test online sync</p>
+          <Button onClick={onStartGhost} variant="outline" className="w-full">
+            Play vs AI (ghost)
+          </Button>
+          <p className="text-[0.7rem] text-stone-400">
+            The AI plays the opponent over the live channel — no second account needed.
+          </p>
         </div>
 
         {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}

@@ -35,6 +35,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
   const [openGames, setOpenGames] = useState([]);
+  const [ghostOpponent, setGhostOpponent] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setMe).catch(() => setMe(null));
@@ -245,13 +246,22 @@ export default function Home() {
   }
 
   async function leaveOnline() {
-    if (onlineGame && onlineGame.status === 'waiting' && onlineGame.white_player_id === me?.id) {
-      try {
-        await base44.entities.Game.delete(onlineGame.id);
-      } catch {
-        // ignore
+    if (onlineGame) {
+      if (ghostOpponent) {
+        try {
+          await base44.entities.Game.delete(onlineGame.id);
+        } catch {
+          // ignore
+        }
+      } else if (onlineGame.status === 'waiting' && onlineGame.white_player_id === me?.id) {
+        try {
+          await base44.entities.Game.delete(onlineGame.id);
+        } catch {
+          // ignore
+        }
       }
     }
+    setGhostOpponent(false);
     setOnlineGame(null);
     setOnlineError('');
     setSubmitting(false);
@@ -338,6 +348,34 @@ export default function Home() {
     setOnlineGame(game);
   }
 
+  // Start an online game whose opponent is the AI ("ghost"), so the live
+  // sync channel can be exercised end-to-end with only one real account.
+  async function startGhost() {
+    setOnlineError('');
+    const user = await ensureUser();
+    if (!user) {
+      setOnlineError('Sign in to play online.');
+      return;
+    }
+    try {
+      const code = generateCode();
+      const rec = await base44.entities.Game.create({
+        code,
+        status: 'active',
+        host_color: 'w',
+        white_player_id: user.id,
+        black_player_id: '__ghost__',
+        moves: [],
+        result: null,
+        last_move_at: new Date().toISOString(),
+      });
+      setGhostOpponent(true);
+      setOnlineGame(rec);
+    } catch (e) {
+      setOnlineError('Could not start ghost game.');
+    }
+  }
+
   // realtime subscription: active-game updates + live lobby refresh
   useEffect(() => {
     if (mode !== 'online') return;
@@ -370,6 +408,24 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, gameOver, promo, localState, difficulty, turn]);
+
+  // ghost opponent: AI plays the other side over the online channel (test mode)
+  useEffect(() => {
+    if (mode !== 'online' || !ghostOpponent || !onlineGame || onlineGame.status !== 'active') return;
+    if (!state || gameOver || submitting || promo) return;
+    if (turn === myColor) return;
+    setThinking(true);
+    const t = setTimeout(() => {
+      const move = bestMove(state, turn, difficulty);
+      if (move) appendMove(serializeMove(move, 'Q'));
+      setThinking(false);
+    }, 400);
+    return () => {
+      clearTimeout(t);
+      setThinking(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, ghostOpponent, onlineGame, state, turn, myColor, gameOver, submitting, promo, difficulty]);
 
   // offer to advance after beating the computer
   useEffect(() => {
@@ -406,6 +462,7 @@ export default function Home() {
             ? `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`
             : 'Stalemate — draw';
       else if (myColor && turn === myColor) statusText = 'Your move';
+      else if (ghostOpponent && thinking) statusText = 'Ghost is thinking…';
       else statusText = `Waiting for ${turn === 'w' ? 'White' : 'Black'}…`;
     } else if (onlineGame.status === 'finished') {
       const won =
@@ -488,7 +545,7 @@ export default function Home() {
                 </button>
               </div>
 
-              {mode === 'computer' && (
+              {(mode === 'computer' || (mode === 'online' && ghostOpponent)) && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
@@ -562,6 +619,7 @@ export default function Home() {
                 onJoinCode={joinOnline}
                 onJoinGame={joinSpecific}
                 onReenterOwn={reenterOwn}
+                onStartGhost={startGhost}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
               />
