@@ -1,6 +1,7 @@
 // Standard Algebraic Notation for Truth Chess moves, plus helpers to build
-// a full SAN list from a stored move list and to classify a move for sound.
-import { initialState, makeMove, gameStatus, allLegalMoves } from './chessVariant';
+// a full SAN list from a stored move list, classify a move for sound, detect
+// threefold repetition, and export a PGN string.
+import { initialState, makeMove, gameStatus, allLegalMoves, positionKey } from './chessVariant';
 
 export function squareName([r, f]) {
   return String.fromCharCode(97 + f) + (8 - r);
@@ -74,4 +75,40 @@ export function classifyMove(moves) {
   if (st === 'stalemate') return 'stale';
   if (st === 'check') return 'check';
   return captured ? 'capture' : 'move';
+}
+
+// Threefold repetition: any position occurring 3+ times in the move history.
+export function hasThreefold(moves) {
+  let st = initialState();
+  const counts = new Map();
+  counts.set(positionKey(st), 1);
+  for (const m of moves || []) {
+    st = makeMove(st, m, m.promoType || 'Q');
+    const k = positionKey(st);
+    const c = (counts.get(k) || 0) + 1;
+    if (c >= 3) return true;
+    counts.set(k, c);
+  }
+  return false;
+}
+
+// Export a PGN string from a SAN list and a result tag.
+export function toPGN(sans, result, extra = {}) {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  const headers = [
+    ['Event', 'Truth Chess'],
+    ['Site', 'Truth Chess'],
+    ['Date', date],
+    ['Result', result],
+  ];
+  if (extra.white) headers.push(['White', extra.white]);
+  if (extra.black) headers.push(['Black', extra.black]);
+  let movetext = '';
+  for (let i = 0; i < sans.length; i++) {
+    if (i % 2 === 0) movetext += `${i / 2 + 1}. `;
+    movetext += sans[i] + ' ';
+  }
+  movetext = movetext.trim();
+  const body = movetext ? `${movetext} ${result}` : result;
+  return headers.map(([k, v]) => `[${k} "${v}"]`).join('\n') + '\n\n' + body;
 }

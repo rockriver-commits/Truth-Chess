@@ -1,7 +1,10 @@
 import React from 'react';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
+const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T' };
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+
+import { getBoardTheme } from '@/components/ThemePicker';
 
 function Cross({ color }) {
   const fill = color === 'w' ? '#f8fafc' : '#1f2937';
@@ -29,7 +32,10 @@ export default function ChessBoard({
   flipped = false,
   checkSquare = null,
   hintMove = null,
+  boardTheme = 'classic',
+  pieceStyle = 'figurine',
 }) {
+  const theme = getBoardTheme(boardTheme);
   const destSet = new Set(legalMoves.map((m) => `${m.to[0]},${m.to[1]}`));
   const selKey = selected ? `${selected[0]},${selected[1]}` : null;
   const lastSet = lastMove
@@ -44,7 +50,7 @@ export default function ChessBoard({
 
   return (
     <div className="w-full max-w-[620px] mx-auto select-none">
-      <div className="grid grid-cols-10 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 bg-stone-100">
+      <div className="grid grid-cols-10 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10">
         {Array.from({ length: 8 }).map((_, di) =>
           Array.from({ length: 10 }).map((_, dj) => {
             const r = flipped ? 7 - di : di;
@@ -57,24 +63,24 @@ export default function ChessBoard({
             const isCheck = checkKey === key;
             const isHint = hintSet.has(key);
             const piece = board[r][f];
+
+            let bg = dark ? theme.dark : theme.light;
+            if (isLast && !isSel) bg = 'rgba(251,191,36,0.35)';
+            if (isSel) bg = 'rgba(251,191,36,0.55)';
+            if (isCheck) bg = 'rgba(244,63,94,0.55)';
+
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => onSquareClick(r, f)}
-                className={[
-                  'relative aspect-square flex items-center justify-center transition-colors duration-150',
-                  dark ? 'bg-stone-300' : 'bg-stone-50',
-                  isLast && !isSel ? 'bg-amber-200/70' : '',
-                  isSel ? 'bg-amber-300/90' : '',
-                  isCheck ? 'bg-rose-400/60' : '',
-                ].join(' ')}
+                className="relative aspect-square flex items-center justify-center transition-colors duration-150"
+                style={{ backgroundColor: bg }}
               >
                 {dj === 0 && (
                   <span
-                    className={`absolute top-0.5 left-1 text-[0.55rem] font-semibold ${
-                      dark ? 'text-stone-50/80' : 'text-stone-400'
-                    }`}
+                    className="absolute top-0.5 left-1 text-[0.55rem] font-semibold"
+                    style={{ color: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.45)' }}
                   >
                     {8 - r}
                   </span>
@@ -89,7 +95,9 @@ export default function ChessBoard({
                     <span
                       className="relative leading-none"
                       style={{
-                        fontSize: 'min(7.8vw, 2.5rem)',
+                        fontSize: pieceStyle === 'letter' ? 'min(6vw, 1.6rem)' : 'min(7.8vw, 2.5rem)',
+                        fontWeight: pieceStyle === 'letter' ? 700 : 400,
+                        fontFamily: pieceStyle === 'letter' ? 'ui-monospace, monospace' : undefined,
                         color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
                         textShadow:
                           piece.color === 'w'
@@ -97,7 +105,7 @@ export default function ChessBoard({
                             : '0 1px 1px rgba(255,255,255,0.25)',
                       }}
                     >
-                      {GLYPHS[piece.type]}
+                      {pieceStyle === 'letter' ? LETTERS[piece.type] : GLYPHS[piece.type]}
                     </span>
                   ))}
                 {isDest && !piece && <span className="absolute w-1/3 h-1/3 rounded-full bg-emerald-600/40" />}

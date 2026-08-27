@@ -40,3 +40,24 @@ export function replayGame(moves) {
   }
   return { state, captured, lastMove };
 }
+
+// Replay a stored move list into an array of per-move snapshots (including
+// the initial position at index 0) — used for post-game step-through review.
+export function replayStates(moves) {
+  let state = initialState();
+  const captured = { w: [], b: [] };
+  const list = [{ state, captured: { w: [], b: [] }, lastMove: null }];
+  for (const m of moves || []) {
+    const mover = state.turn;
+    let cap = null;
+    if (m.ep) cap = state.board[m.capturedAt[0]][m.capturedAt[1]];
+    else cap = state.board[m.to[0]][m.to[1]];
+    const next = { w: [...captured.w], b: [...captured.b] };
+    if (cap) next[mover].push(cap);
+    state = makeMove(state, m, m.promoType || 'Q');
+    captured.w = next.w;
+    captured.b = next.b;
+    list.push({ state, captured: next, lastMove: m });
+  }
+  return list;
+}

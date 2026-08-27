@@ -25,6 +25,7 @@ export function initialState() {
     turn: 'w',
     castling: { w: { K: true, Q: true }, b: { K: true, Q: true } },
     ep: null,
+    halfmove: 0,
   };
 }
 
@@ -280,6 +281,22 @@ export function findKing(board, color) {
   return null;
 }
 
+// Stable position key for repetition detection (board + turn + castling + ep).
+export function positionKey(state) {
+  let s = state.turn + '|';
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = state.board[r][f];
+      s += p ? p.color + p.type : '.';
+    }
+    s += '|';
+  }
+  s += (state.castling.w.K ? 'K' : '') + (state.castling.w.Q ? 'Q' : '')
+    + (state.castling.b.K ? 'k' : '') + (state.castling.b.Q ? 'q' : '') + '|';
+  s += state.ep ? state.ep[0] + ',' + state.ep[1] : '-';
+  return s;
+}
+
 export function inCheck(state, color) {
   const k = findKing(state.board, color);
   if (!k) return false;
@@ -331,7 +348,10 @@ function applyMove(state, move, promoType = 'Q') {
     ep = [(tr + fr) / 2, ff];
   }
 
-  return { board: nb, turn: piece.color === 'w' ? 'b' : 'w', castling, ep };
+  const resetHalf = piece.type === 'P' || !!move.captured;
+  const halfmove = resetHalf ? 0 : (state.halfmove || 0) + 1;
+
+  return { board: nb, turn: piece.color === 'w' ? 'b' : 'w', castling, ep, halfmove };
 }
 
 export function legalMovesFor(state, r, f) {
@@ -358,6 +378,7 @@ export function gameStatus(state) {
   const moves = allLegalMoves(state, state.turn);
   const checked = inCheck(state, state.turn);
   if (moves.length === 0) return checked ? 'checkmate' : 'stalemate';
+  if ((state.halfmove || 0) >= 100) return 'fifty_move';
   return checked ? 'check' : 'playing';
 }
 

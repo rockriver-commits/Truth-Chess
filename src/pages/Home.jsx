@@ -8,14 +8,16 @@ import {
   findKing,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
-import { generateCode, replayGame, serializeMove } from '@/lib/onlineGame';
-import { moveToSAN, movesToSAN, classifyMove } from '@/lib/chessNotation';
+import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
+import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import OnlinePanel from '@/components/OnlinePanel';
 import Leaderboard from '@/components/Leaderboard';
 import MoveHistory from '@/components/MoveHistory';
+import ReplayBar from '@/components/ReplayBar';
+import ThemePicker from '@/components/ThemePicker';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -41,17 +43,27 @@ export default function Home() {
   const [pendingAdvance, setPendingAdvance] = useState(false);
 
   // batch-1 additions
-  const [flipped, setFlipped] = useState(false); // manual flip toggle
-  const [autoFlip, setAutoFlip] = useState(true); // 2-player auto-flip
+  const [flipped, setFlipped] = useState(false);
+  const [autoFlip, setAutoFlip] = useState(true);
   const [hint, setHint] = useState(null);
   const [hintLoading, setHintLoading] = useState(false);
   const [resigned, setResigned] = useState(false);
-  const [moveSan, setMoveSan] = useState([]);
   const [soundOn, setSoundOn] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [startMs, setStartMs] = useState(Date.now());
   const prevMovesLen = useRef(0);
   const playSound = useChessSounds(soundOn);
+
+  // batch-2 additions
+  const [localMoves, setLocalMoves] = useState([]);
+  const [drawAgreed, setDrawAgreed] = useState(false);
+  const [reviewIdx, setReviewIdx] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [boardTheme, setBoardTheme] = useState(() => localStorage.getItem('tc-board-theme') || 'classic');
+  const [pieceStyle, setPieceStyle] = useState(() => localStorage.getItem('tc-piece-style') || 'figurine');
+
+  useEffect(() => localStorage.setItem('tc-board-theme', boardTheme), [boardTheme]);
+  useEffect(() => localStorage.setItem('tc-piece-style', pieceStyle), [pieceStyle]);
 
   // online
   const [me, setMe] = useState(null);
@@ -84,8 +96,45 @@ export default function Home() {
   const turn = state?.turn;
 
   const status = useMemo(() => (state ? gameStatus(state) : 'playing'), [state]);
-  const localOver = mode !== 'online' && resigned;
-  const gameOver = status === 'checkmate' || status === 'stalemate' || localOver;
+
+  // threefold repetition (50-move is already in `status` via the engine)
+  const threefold = useMemo(() => {
+    if (mode === 'online' && onlineGame) return hasThreefold(onlineGame.moves || []);
+    return hasThreefold(localMoves);
+  }, [mode, onlineGame, localMoves]);
+
+  const localOver = mode !== 'online' && (resigned || drawAgreed);
+  const gameOver =
+    status === 'checkmate' ||
+    status === 'stalemate' ||
+    status === 'fifty_move' ||
+    threefold ||
+    localOver;
+
+  const moveSanDisplay = useMemo(() => {
+    if (mode === 'online' && onlineGame) return movesToSAN(onlineGame.moves || []);
+    return movesToSAN(localMoves);
+  }, [mode, onlineGame, localMoves]);
+
+  // per-move snapshots for post-game replay (index 0 = initial position)
+  const positionList = useMemo(() => {
+    if (mode === 'online' && onlineGame) return replayStates(onlineGame.moves || []);
+    return replayStates(localMoves);
+  }, [mode, onlineGame, localMoves]);
+
+  const reviewing = reviewIdx !== null;
+  const viewIndex = reviewing
+    ? Math.max(0, Math.min(reviewIdx, positionList.length - 1))
+    : Math.max(0, positionList.length - 1);
+  const view = positionList[viewIndex] || { state, captured, lastMove };
+  const viewState = view.state;
+  const viewCaptured = view.captured || { w: [], b: [] };
+  const viewLastMove = view.lastMove || null;
+  const viewStatus = useMemo(() => (viewState ? gameStatus(viewState) : 'playing'), [viewState]);
+  const viewCheck =
+    viewStatus === 'check' || viewStatus === 'checkmate'
+      ? findKing(viewState.board, viewState.turn)
+      : null;
 
   const effectiveFlipped = useMemo(() => {
     if (mode === 'local') return autoFlip ? turn === 'b' : flipped;
@@ -93,27 +142,32 @@ export default function Home() {
     return flipped; // computer
   }, [mode, autoFlip, turn, flipped, myColor]);
 
-  const checkSquare = useMemo(() => {
-    if (!state) return null;
-    if (status !== 'check' && status !== 'checkmate') return null;
-    return findKing(state.board, state.turn);
-  }, [state, status]);
-
-  const moveSanDisplay = useMemo(() => {
-    if (mode === 'online' && onlineGame) return movesToSAN(onlineGame.moves || []);
-    return moveSan;
-  }, [mode, onlineGame, moveSan]);
-
   const humanToMove = useMemo(() => {
-    if (!state || gameOver || resigned || submitting || promo) return false;
+    if (!state || gameOver || resigned || drawAgreed || submitting || promo || reviewing) return false;
     if (mode === 'local') return true;
     if (mode === 'computer') return turn === 'w';
     if (mode === 'online') return onlineGame?.status === 'active' && !!myColor && turn === myColor;
     return false;
-  }, [state, gameOver, resigned, submitting, promo, mode, turn, myColor, onlineGame?.status]);
+  }, [state, gameOver, resigned, drawAgreed, submitting, promo, reviewing, mode, turn, myColor, onlineGame?.status]);
+
+  const resultStr = useMemo(() => {
+    if (mode === 'online' && onlineGame) {
+      if (!onlineGame.result) return '*';
+      return onlineGame.result === 'white_wins'
+        ? '1-0'
+        : onlineGame.result === 'black_wins'
+        ? '0-1'
+        : '1/2-1/2';
+    }
+    if (drawAgreed) return '1/2-1/2';
+    if (resigned) return turn === 'w' ? '0-1' : '1-0';
+    if (status === 'checkmate') return turn === 'w' ? '0-1' : '1-0';
+    if (status === 'stalemate' || status === 'fifty_move' || threefold) return '1/2-1/2';
+    return '*';
+  }, [mode, onlineGame, drawAgreed, resigned, turn, status, threefold]);
 
   function handleSquareClick(r, f) {
-    if (gameOver || promo || submitting) return;
+    if (reviewing || gameOver || promo || submitting) return;
     if (mode === 'computer' && turn === 'b') return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active') return;
@@ -159,13 +213,12 @@ export default function Home() {
     }
     const ns = makeMove(localState, move, promoType);
     const st = gameStatus(ns);
-    if (st === 'checkmate' || st === 'stalemate') playSound('mate');
+    if (st === 'checkmate' || st === 'stalemate' || st === 'fifty_move') playSound('mate');
     else if (st === 'check') playSound('check');
     else if (move.captured) playSound('capture');
     else playSound('move');
 
-    const san = moveToSAN(localState, move, promoType);
-    setMoveSan((s) => [...s, san]);
+    setLocalMoves((m) => [...m, serializeMove(move, promoType)]);
     setHistory((h) => [...h, { state: localState, captured: localCaptured, lastMove: localLastMove }]);
     if (move.captured) {
       setLocalCaptured((c) => ({ ...c, [localState.turn]: [...c[localState.turn], move.captured] }));
@@ -176,6 +229,7 @@ export default function Home() {
     setLegalMoves([]);
     setPromo(null);
     setHint(null);
+    setReviewIdx(null);
   }
 
   function choosePromo(type) {
@@ -188,13 +242,14 @@ export default function Home() {
     if (history.length < 2) return;
     const target = history[history.length - 2];
     setHistory((h) => h.slice(0, h.length - 2));
-    setMoveSan((s) => s.slice(0, Math.max(0, s.length - 2)));
+    setLocalMoves((m) => m.slice(0, Math.max(0, m.length - 2)));
     setLocalState(target.state);
     setLocalCaptured(target.captured);
     setLocalLastMove(target.lastMove);
     setSelected(null);
     setLegalMoves([]);
     setHint(null);
+    setReviewIdx(null);
   }
 
   function resign() {
@@ -207,6 +262,12 @@ export default function Home() {
     playSound('mate');
   }
 
+  function offerDraw() {
+    if (mode !== 'local' || gameOver) return;
+    setDrawAgreed(true);
+    playSound('mate');
+  }
+
   function showHint() {
     if (!humanToMove || hintLoading) return;
     setHintLoading(true);
@@ -215,6 +276,18 @@ export default function Home() {
       setHint(m);
       setHintLoading(false);
     }, 30);
+  }
+
+  async function copyPGN() {
+    if (!moveSanDisplay.length) return;
+    const pgn = toPGN(moveSanDisplay, resultStr);
+    try {
+      await navigator.clipboard.writeText(pgn);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
   }
 
   function resetLocal() {
@@ -230,7 +303,10 @@ export default function Home() {
     setHint(null);
     setHintLoading(false);
     setResigned(false);
-    setMoveSan([]);
+    setDrawAgreed(false);
+    setLocalMoves([]);
+    setReviewIdx(null);
+    setCopied(false);
     setStartMs(Date.now());
     setElapsed(0);
   }
@@ -326,7 +402,7 @@ export default function Home() {
       if (st === 'checkmate') {
         patch.status = 'finished';
         patch.result = ns.turn === 'w' ? 'black_wins' : 'white_wins';
-      } else if (st === 'stalemate') {
+      } else if (st === 'stalemate' || st === 'fifty_move' || hasThreefold(newMoves)) {
         patch.status = 'finished';
         patch.result = 'draw';
       }
@@ -446,8 +522,6 @@ export default function Home() {
     setOnlineGame(game);
   }
 
-  // Start an online game whose opponent is the AI ("ghost"), so the live
-  // sync channel can be exercised end-to-end with only one real account.
   async function startGhost() {
     setOnlineError('');
     const user = await ensureUser();
@@ -498,7 +572,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGame?.id]);
 
-  // start/elapsed clock for an online game once it becomes active
   useEffect(() => {
     if (mode === 'online' && onlineGame?.status === 'active') {
       setStartMs(Date.now());
@@ -508,7 +581,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGame?.status, onlineGame?.id]);
 
-  // elapsed timer (ticks while a game is in progress)
   useEffect(() => {
     const active = mode === 'online' ? onlineGame?.status === 'active' && !gameOver : !gameOver;
     if (!active) return undefined;
@@ -551,7 +623,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, ghostOpponent, onlineGame, state, turn, myColor, gameOver, submitting, promo, difficulty]);
 
-  // offer to advance after beating the computer
   useEffect(() => {
     if (mode === 'computer' && status === 'checkmate' && turn === 'b' && difficulty < 8) {
       setPendingAdvance(true);
@@ -578,6 +649,10 @@ export default function Home() {
         statusText =
           status === 'checkmate'
             ? `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`
+            : status === 'fifty_move'
+            ? 'Draw — 50-move rule'
+            : threefold
+            ? 'Draw — threefold repetition'
             : 'Stalemate — draw';
       else if (myColor && turn === myColor) statusText = 'Your move';
       else if (ghostOpponent && thinking) statusText = 'Ghost is thinking…';
@@ -592,7 +667,8 @@ export default function Home() {
       statusText = 'Loading…';
     }
   } else {
-    if (resigned) {
+    if (drawAgreed) statusText = 'Draw by agreement';
+    else if (resigned) {
       statusText =
         mode === 'computer'
           ? 'You resigned — Computer wins'
@@ -603,7 +679,10 @@ export default function Home() {
         check: `${turn === 'w' ? 'White' : 'Black'} is in check`,
         checkmate: `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`,
         stalemate: 'Stalemate — draw',
+        fifty_move: 'Draw — 50-move rule',
       }[status] || 'Loading…';
+      if (threefold && !gameOver) statusText = `${statusText} (threefold)`;
+      if (threefold && gameOver) statusText = 'Draw — threefold repetition';
       if (thinking) statusText = 'Computer is thinking…';
     } else {
       statusText = 'Loading…';
@@ -633,21 +712,38 @@ export default function Home() {
           <div className="flex flex-col items-center">
             {state ? (
               <>
-                <CapturedRow pieces={captured.w} label="White has captured" />
+                <CapturedRow pieces={viewCaptured.w} label="White has captured" />
                 <div className="my-3 w-full flex justify-center">
                   <ChessBoard
-                    board={state.board}
-                    selected={selected}
-                    legalMoves={legalMoves}
-                    lastMove={lastMove}
+                    board={viewState.board}
+                    selected={reviewing ? null : selected}
+                    legalMoves={reviewing ? [] : legalMoves}
+                    lastMove={viewLastMove}
                     onSquareClick={handleSquareClick}
                     flipped={effectiveFlipped}
-                    checkSquare={checkSquare}
-                    hintMove={hint}
+                    checkSquare={viewCheck}
+                    hintMove={reviewing ? null : hint}
+                    boardTheme={boardTheme}
+                    pieceStyle={pieceStyle}
                   />
                 </div>
-                <CapturedRow pieces={captured.b} label="Black has captured" />
+                <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
                 <MoveHistory sans={moveSanDisplay} />
+                {gameOver && positionList.length > 1 && (
+                  <ReplayBar
+                    index={reviewIdx}
+                    total={positionList.length}
+                    onFirst={() => setReviewIdx(0)}
+                    onPrev={() =>
+                      setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
+                    }
+                    onNext={() =>
+                      setReviewIdx((i) => (i === null ? null : Math.min(positionList.length - 1, i + 1)))
+                    }
+                    onLast={() => setReviewIdx(positionList.length - 1)}
+                    onLive={() => setReviewIdx(null)}
+                  />
+                )}
               </>
             ) : (
               <div className="w-full max-w-[620px] aspect-[10/8] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
@@ -658,8 +754,8 @@ export default function Home() {
 
           <aside className="space-y-5">
             {/* Game controls (all modes) */}
-            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4 space-y-3">
+              <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
                 <span className="text-xs font-mono text-stone-500">⏱ {fmtTime(elapsed)}</span>
               </div>
@@ -693,6 +789,24 @@ export default function Home() {
                     Resign
                   </Button>
                 )}
+                {mode === 'local' && !gameOver && (
+                  <Button size="sm" variant="outline" onClick={offerDraw}>
+                    Draw
+                  </Button>
+                )}
+                {moveSanDisplay.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={copyPGN} className="col-span-2">
+                    {copied ? 'Copied!' : 'Copy PGN'}
+                  </Button>
+                )}
+              </div>
+              <div className="pt-1 border-t border-stone-100">
+                <ThemePicker
+                  boardTheme={boardTheme}
+                  pieceStyle={pieceStyle}
+                  onBoardTheme={setBoardTheme}
+                  onPieceStyle={setPieceStyle}
+                />
               </div>
             </div>
 
@@ -819,7 +933,7 @@ export default function Home() {
                     opposing King — it acts as a passive blocker.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
-                  <li>• Use <span className="font-medium text-stone-800">Hint</span> for a suggested move, <span className="font-medium text-stone-800">Flip board</span> to change orientation, and <span className="font-medium text-stone-800">Resign</span> to end the game.</li>
+                  <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy PGN</span> to export the game.</li>
                 </ul>
               </div>
             )}
