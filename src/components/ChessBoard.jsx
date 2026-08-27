@@ -29,6 +29,7 @@ export default function ChessBoard({
   legalMoves,
   lastMove,
   onSquareClick,
+  onDropMove,
   flipped = false,
   checkSquare = null,
   hintMove = null,
@@ -74,6 +75,15 @@ export default function ChessBoard({
                 key={key}
                 type="button"
                 onClick={() => onSquareClick(r, f)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const data = e.dataTransfer.getData('text/plain');
+                  if (!data || !onDropMove) return;
+                  const [fr, ff] = data.split(',').map(Number);
+                  if (Number.isNaN(fr) || Number.isNaN(ff)) return;
+                  onDropMove([fr, ff], [r, f]);
+                }}
                 className="relative aspect-square flex items-center justify-center transition-colors duration-150"
                 style={{ backgroundColor: bg }}
               >
@@ -88,26 +98,36 @@ export default function ChessBoard({
                 {isHint && (
                   <span className="absolute inset-0 ring-2 ring-emerald-500/70 rounded-sm pointer-events-none" />
                 )}
-                {piece &&
-                  (piece.type === 'T' ? (
-                    <Cross color={piece.color} />
-                  ) : (
-                    <span
-                      className="relative leading-none"
-                      style={{
-                        fontSize: pieceStyle === 'letter' ? 'min(6vw, 1.6rem)' : 'min(7.8vw, 2.5rem)',
-                        fontWeight: pieceStyle === 'letter' ? 700 : 400,
-                        fontFamily: pieceStyle === 'letter' ? 'ui-monospace, monospace' : undefined,
-                        color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
-                        textShadow:
-                          piece.color === 'w'
-                            ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
-                            : '0 1px 1px rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {pieceStyle === 'letter' ? LETTERS[piece.type] : GLYPHS[piece.type]}
-                    </span>
-                  ))}
+                {piece && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', `${r},${f}`);
+                      onSquareClick(r, f);
+                    }}
+                    className="flex items-center justify-center w-full h-full cursor-grab"
+                  >
+                    {piece.type === 'T' ? (
+                      <Cross color={piece.color} />
+                    ) : (
+                      <span
+                        className="relative leading-none"
+                        style={{
+                          fontSize: pieceStyle === 'letter' ? 'min(6vw, 1.6rem)' : 'min(7.8vw, 2.5rem)',
+                          fontWeight: pieceStyle === 'letter' ? 700 : 400,
+                          fontFamily: pieceStyle === 'letter' ? 'ui-monospace, monospace' : undefined,
+                          color: piece.color === 'w' ? '#f8fafc' : '#1f2937',
+                          textShadow:
+                            piece.color === 'w'
+                              ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
+                              : '0 1px 1px rgba(255,255,255,0.25)',
+                        }}
+                      >
+                        {pieceStyle === 'letter' ? LETTERS[piece.type] : GLYPHS[piece.type]}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {isDest && !piece && <span className="absolute w-1/3 h-1/3 rounded-full bg-emerald-600/40" />}
                 {isDest && piece && <span className="absolute inset-1 rounded-full ring-2 ring-emerald-600/60" />}
               </button>

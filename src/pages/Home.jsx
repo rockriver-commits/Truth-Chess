@@ -18,8 +18,17 @@ import Leaderboard from '@/components/Leaderboard';
 import MoveHistory from '@/components/MoveHistory';
 import ReplayBar from '@/components/ReplayBar';
 import ThemePicker from '@/components/ThemePicker';
+import ClockBar from '@/components/ClockBar';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
+
+const TIME_CONTROLS = {
+  unlimited: { label: 'Unlimited', initial: null, inc: 0 },
+  '3+2': { label: '3+2 Blitz', initial: 180, inc: 2 },
+  '5+0': { label: '5+0 Bullet', initial: 300, inc: 0 },
+  '10+0': { label: '10+0 Rapid', initial: 600, inc: 0 },
+  '15+10': { label: '15+10', initial: 900, inc: 10 },
+};
 
 function fmtTime(s) {
   const m = Math.floor(s / 60);
@@ -61,6 +70,10 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [boardTheme, setBoardTheme] = useState(() => localStorage.getItem('tc-board-theme') || 'classic');
   const [pieceStyle, setPieceStyle] = useState(() => localStorage.getItem('tc-piece-style') || 'figurine');
+  const [timeControl, setTimeControl] = useState('unlimited');
+  const [whiteClock, setWhiteClock] = useState(null);
+  const [blackClock, setBlackClock] = useState(null);
+  const [timedOut, setTimedOut] = useState(null);
 
   useEffect(() => localStorage.setItem('tc-board-theme', boardTheme), [boardTheme]);
   useEffect(() => localStorage.setItem('tc-piece-style', pieceStyle), [pieceStyle]);
@@ -103,7 +116,7 @@ export default function Home() {
     return hasThreefold(localMoves);
   }, [mode, onlineGame, localMoves]);
 
-  const localOver = mode !== 'online' && (resigned || drawAgreed);
+  const localOver = mode !== 'online' && (resigned || drawAgreed || !!timedOut);
   const gameOver =
     status === 'checkmate' ||
     status === 'stalemate' ||
@@ -159,6 +172,7 @@ export default function Home() {
         ? '0-1'
         : '1/2-1/2';
     }
+    if (timedOut) return timedOut === 'w' ? '0-1' : '1-0';
     if (drawAgreed) return '1/2-1/2';
     if (resigned) return turn === 'w' ? '0-1' : '1-0';
     if (status === 'checkmate') return turn === 'w' ? '0-1' : '1-0';
@@ -202,6 +216,26 @@ export default function Home() {
     }
   }
 
+  function handleDropMove(from, to) {
+    if (reviewing || gameOver || promo || submitting) return;
+    if (mode === 'computer' && turn === 'b') return;
+    if (mode === 'online') {
+      if (!onlineGame || onlineGame.status !== 'active' || !myColor || turn !== myColor) return;
+    }
+    const piece = state.board[from[0]][from[1]];
+    if (!piece || piece.color !== turn) return;
+    const moves = legalMovesFor(state, from[0], from[1]);
+    const move = moves.find((m) => m.to[0] === to[0] && m.to[1] === to[1]);
+    if (!move) return;
+    if (move.promotion) {
+      setSelected(null);
+      setLegalMoves([]);
+      setPromo({ move, color: turn });
+      return;
+    }
+    commitMove(move, 'Q');
+  }
+
   function commitMove(move, promoType) {
     if (mode === 'online') {
       setSelected(null);
@@ -222,6 +256,11 @@ export default function Home() {
     setHistory((h) => [...h, { state: localState, captured: localCaptured, lastMove: localLastMove }]);
     if (move.captured) {
       setLocalCaptured((c) => ({ ...c, [localState.turn]: [...c[localState.turn], move.captured] }));
+    }
+    if (timeControl !== 'unlimited') {
+      const inc = TIME_CONTROLS[timeControl].inc;
+      if (localState.turn === 'w') setWhiteClock((c) => (c ?? 0) + inc);
+      else setBlackClock((c) => (c ?? 0) + inc);
     }
     setLocalState(ns);
     setLocalLastMove(move);
@@ -304,9 +343,13 @@ export default function Home() {
     setHintLoading(false);
     setResigned(false);
     setDrawAgreed(false);
+    setTimedOut(null);
     setLocalMoves([]);
     setReviewIdx(null);
     setCopied(false);
+    const tc = TIME_CONTROLS[timeControl];
+    setWhiteClock(tc.initial);
+    setBlackClock(tc.initial);
     setStartMs(Date.now());
     setElapsed(0);
   }
@@ -581,13 +624,43 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGame?.status, onlineGame?.id]);
 
+  // elapsed count-up (online, or local/computer with unlimited time)
   useEffect(() => {
+    const useElapsed = mode === 'online' || timeControl === 'unlimited';
     const active = mode === 'online' ? onlineGame?.status === 'active' && !gameOver : !gameOver;
-    if (!active) return undefined;
+    if (!useElapsed || !active) return undefined;
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startMs, gameOver, mode, onlineGame?.status]);
+  }, [startMs, gameOver, mode, onlineGame?.status, timeControl]);
+
+  // per-side countdown clocks (local & computer, timed control)
+  useEffect(() => {
+    if (mode === 'online' || gameOver || timeControl === 'unlimited') return undefined;
+    let last = Date.now();
+    const id = setInterval(() => {
+      const now = Date.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      if (turn === 'w') setWhiteClock((c) => Math.max(0, (c ?? 0) - dt));
+      else setBlackClock((c) => Math.max(0, (c ?? 0) - dt));
+    }, 200);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, gameOver, timeControl, turn]);
+
+  // flag on time out
+  useEffect(() => {
+    if (mode === 'online' || gameOver || timeControl === 'unlimited' || timedOut) return;
+    if (whiteClock !== null && whiteClock <= 0) {
+      setTimedOut('w');
+      playSound('mate');
+    } else if (blackClock !== null && blackClock <= 0) {
+      setTimedOut('b');
+      playSound('mate');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whiteClock, blackClock, mode, gameOver, timeControl]);
 
   // computer AI
   useEffect(() => {
@@ -667,7 +740,8 @@ export default function Home() {
       statusText = 'Loading…';
     }
   } else {
-    if (drawAgreed) statusText = 'Draw by agreement';
+    if (timedOut) statusText = `${timedOut === 'w' ? 'White' : 'Black'} loses on time`;
+    else if (drawAgreed) statusText = 'Draw by agreement';
     else if (resigned) {
       statusText =
         mode === 'computer'
@@ -712,6 +786,14 @@ export default function Home() {
           <div className="flex flex-col items-center">
             {state ? (
               <>
+                {mode !== 'online' && timeControl !== 'unlimited' && (
+                  <ClockBar
+                    whiteClock={whiteClock}
+                    blackClock={blackClock}
+                    active={gameOver ? null : turn}
+                    flipped={effectiveFlipped}
+                  />
+                )}
                 <CapturedRow pieces={viewCaptured.w} label="White has captured" />
                 <div className="my-3 w-full flex justify-center">
                   <ChessBoard
@@ -720,6 +802,7 @@ export default function Home() {
                     legalMoves={reviewing ? [] : legalMoves}
                     lastMove={viewLastMove}
                     onSquareClick={handleSquareClick}
+                    onDropMove={handleDropMove}
                     flipped={effectiveFlipped}
                     checkSquare={viewCheck}
                     hintMove={reviewing ? null : hint}
@@ -757,8 +840,26 @@ export default function Home() {
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
-                <span className="text-xs font-mono text-stone-500">⏱ {fmtTime(elapsed)}</span>
+                {mode === 'online' || timeControl === 'unlimited' ? (
+                  <span className="text-xs font-mono text-stone-500">⏱ {fmtTime(elapsed)}</span>
+                ) : null}
               </div>
+              {mode !== 'online' && (
+                <div>
+                  <p className="text-[0.65rem] uppercase tracking-widest text-stone-400 mb-1">Time control</p>
+                  <select
+                    value={timeControl}
+                    onChange={(e) => setTimeControl(e.target.value)}
+                    className="w-full text-sm rounded-lg border border-stone-200 bg-white px-2 py-1.5"
+                  >
+                    {Object.keys(TIME_CONTROLS).map((k) => (
+                      <option key={k} value={k}>
+                        {TIME_CONTROLS[k].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant="outline" onClick={() => setFlipped((f) => !f)}>
                   Flip board
