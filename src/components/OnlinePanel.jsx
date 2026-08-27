@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import ChatPanel from '@/components/ChatPanel';
 
-// Online lobby + matchmaking + in-game status. The board and move handling
-// live in Home; this panel handles Quick Match, the live open-games lobby,
-// private host/join-by-code, the waiting room, and resign/leave.
+// Online lobby + matchmaking + in-game status + spectating + chat. The board
+// and move handling live in Home; this panel handles Quick Match, the live
+// open-games lobby, private host/join-by-code, spectating active games, the
+// waiting room, resign/leave, and the in-game chat.
 export default function OnlinePanel({
   onlineGame,
   myColor,
   myId,
   openGames,
+  activeGames,
+  spectator,
   statusText,
   onlineError,
   onQuickMatch,
@@ -18,6 +22,7 @@ export default function OnlinePanel({
   onJoinGame,
   onReenterOwn,
   onStartGhost,
+  onWatch,
   onLeave,
   onResign,
 }) {
@@ -25,6 +30,9 @@ export default function OnlinePanel({
 
   if (!onlineGame) {
     const games = openGames || [];
+    const watchable = (activeGames || []).filter(
+      (g) => g.white_player_id !== myId && g.black_player_id !== myId && g.black_player_id !== '__ghost__'
+    );
     return (
       <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-5">
         <div className="space-y-1.5">
@@ -63,9 +71,7 @@ export default function OnlinePanel({
                         Open
                       </Button>
                     ) : (
-                      <Button size="sm" onClick={() => onJoinGame(g)}>
-                        Join
-                      </Button>
+                      <Button size="sm" onClick={() => onJoinGame(g)}>Join</Button>
                     )}
                   </div>
                 );
@@ -103,6 +109,29 @@ export default function OnlinePanel({
           </div>
         </div>
 
+        {watchable.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-px bg-stone-200 flex-1" />
+              <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">spectate</span>
+              <div className="h-px bg-stone-200 flex-1" />
+            </div>
+            <div className="space-y-2">
+              {watchable.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
+                >
+                  <span className="font-mono text-sm tracking-widest text-stone-700">{g.code}</span>
+                  <Button size="sm" variant="outline" onClick={() => onWatch(g)}>
+                    Watch
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <div className="h-px bg-stone-200 flex-1" />
           <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">test</span>
@@ -133,28 +162,32 @@ export default function OnlinePanel({
         </p>
         <p className="text-sm text-stone-500">{statusText}</p>
         <Button onClick={onLeave} variant="outline" className="w-full">Cancel</Button>
+        {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
       </div>
     );
   }
 
-  const youAre = myColor === 'w' ? 'White' : 'Black';
+  const youAre = spectator ? 'Spectator' : myColor === 'w' ? 'White' : 'Black';
   return (
-    <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-stone-400">Status</p>
-          <p className="text-lg font-medium text-stone-800">{statusText}</p>
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-stone-400">Status</p>
+            <p className="text-lg font-medium text-stone-800">{statusText}</p>
+          </div>
+          <span className="text-xs text-stone-400">You: {youAre}</span>
         </div>
-        <span className="text-xs text-stone-400">You: {youAre}</span>
+        <p className="text-[0.65rem] uppercase tracking-widest text-stone-400">Code: {onlineGame.code}</p>
+        {!spectator && onlineGame.status === 'active' && (
+          <Button onClick={onResign} variant="outline" className="w-full">Resign</Button>
+        )}
+        <Button onClick={onLeave} variant="outline" className="w-full">
+          {spectator ? 'Stop spectating' : 'Leave'}
+        </Button>
+        {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
       </div>
-      <p className="text-[0.65rem] uppercase tracking-widest text-stone-400">Code: {onlineGame.code}</p>
-      {onlineGame.status === 'active' && (
-        <Button onClick={onResign} variant="outline" className="w-full">Resign</Button>
-      )}
-      {onlineGame.status === 'finished' && (
-        <Button onClick={onLeave} variant="outline" className="w-full">Leave</Button>
-      )}
-      {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
+      <ChatPanel gameCode={onlineGame.code} userId={myId} />
     </div>
   );
 }

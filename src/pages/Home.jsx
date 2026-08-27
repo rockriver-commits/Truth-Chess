@@ -19,6 +19,7 @@ import MoveHistory from '@/components/MoveHistory';
 import ReplayBar from '@/components/ReplayBar';
 import ThemePicker from '@/components/ThemePicker';
 import ClockBar from '@/components/ClockBar';
+import StatsPanel from '@/components/StatsPanel';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -84,7 +85,9 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
   const [openGames, setOpenGames] = useState([]);
+  const [activeGames, setActiveGames] = useState([]);
   const [ghostOpponent, setGhostOpponent] = useState(false);
+  const [spectator, setSpectator] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setMe).catch(() => setMe(null));
@@ -475,6 +478,7 @@ export default function Home() {
       }
     }
     setGhostOpponent(false);
+    setSpectator(false);
     setOnlineGame(null);
     setOnlineError('');
     setSubmitting(false);
@@ -500,8 +504,12 @@ export default function Home() {
 
   async function refreshOpenGames() {
     try {
-      const list = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
-      setOpenGames(list || []);
+      const [waiting, active] = await Promise.all([
+        base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50),
+        base44.entities.Game.filter({ status: 'active' }, 'created_date', 50),
+      ]);
+      setOpenGames(waiting || []);
+      setActiveGames(active || []);
     } catch {
       // ignore
     }
@@ -561,6 +569,13 @@ export default function Home() {
 
   function reenterOwn(game) {
     setOnlineError('');
+    prevMovesLen.current = game.moves?.length || 0;
+    setOnlineGame(game);
+  }
+
+  function watchGame(game) {
+    setOnlineError('');
+    setSpectator(true);
     prevMovesLen.current = game.moves?.length || 0;
     setOnlineGame(game);
   }
@@ -717,7 +732,17 @@ export default function Home() {
     if (!onlineGame) statusText = 'Create or join a game';
     else if (onlineGame.status === 'waiting') statusText = 'Waiting for opponent…';
     else if (onlineGame.status === 'active') {
-      if (submitting) statusText = 'Sending move…';
+      if (spectator) {
+        statusText = gameOver
+          ? (status === 'checkmate'
+            ? `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`
+            : status === 'fifty_move'
+            ? 'Draw — 50-move rule'
+            : threefold
+            ? 'Draw — threefold repetition'
+            : 'Stalemate — draw')
+          : `Spectating — ${turn === 'w' ? 'White' : 'Black'} to move`;
+      } else if (submitting) statusText = 'Sending move…';
       else if (gameOver)
         statusText =
           status === 'checkmate'
@@ -731,11 +756,18 @@ export default function Home() {
       else if (ghostOpponent && thinking) statusText = 'Ghost is thinking…';
       else statusText = `Waiting for ${turn === 'w' ? 'White' : 'Black'}…`;
     } else if (onlineGame.status === 'finished') {
-      const won =
-        (onlineGame.result === 'white_wins' && myColor === 'w') ||
-        (onlineGame.result === 'black_wins' && myColor === 'b');
-      statusText =
-        onlineGame.result === 'draw' ? 'Draw' : won ? 'You won!' : 'You lost';
+      if (spectator) {
+        statusText =
+          onlineGame.result === 'draw'
+            ? 'Spectating — Draw'
+            : `Spectating — ${onlineGame.result === 'white_wins' ? 'White' : 'Black'} won`;
+      } else {
+        const won =
+          (onlineGame.result === 'white_wins' && myColor === 'w') ||
+          (onlineGame.result === 'black_wins' && myColor === 'b');
+        statusText =
+          onlineGame.result === 'draw' ? 'Draw' : won ? 'You won!' : 'You lost';
+      }
     } else {
       statusText = 'Loading…';
     }
@@ -1009,6 +1041,8 @@ export default function Home() {
                 myColor={myColor}
                 myId={me?.id}
                 openGames={openGames}
+                activeGames={activeGames}
+                spectator={spectator}
                 statusText={statusText}
                 onlineError={onlineError}
                 onQuickMatch={quickMatch}
@@ -1017,6 +1051,7 @@ export default function Home() {
                 onJoinGame={joinSpecific}
                 onReenterOwn={reenterOwn}
                 onStartGhost={startGhost}
+                onWatch={watchGame}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
               />
@@ -1041,7 +1076,8 @@ export default function Home() {
           </aside>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
+          {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
         </div>
       </div>

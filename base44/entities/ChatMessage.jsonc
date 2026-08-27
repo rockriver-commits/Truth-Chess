@@ -1,0 +1,19 @@
+{
+  "name": "ChatMessage",
+  "type": "object",
+  "properties": {
+    "game_code": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "game_code",
+    "text"
+  ]
+}
