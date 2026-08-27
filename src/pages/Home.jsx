@@ -20,6 +20,7 @@ import ReplayBar from '@/components/ReplayBar';
 import ThemePicker from '@/components/ThemePicker';
 import ClockBar from '@/components/ClockBar';
 import StatsPanel from '@/components/StatsPanel';
+import { isMobileApp } from '@/lib/isMobileApp';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -97,6 +98,9 @@ export default function Home() {
   }, []);
 
   const isPro = me?.plan === 'pro';
+  // Base44 Payments can't sell digital subscriptions inside mobile app stores,
+  // so the Pro upgrade path is only shown in browsers (web), not the native apps.
+  const canUpgrade = !isMobileApp();
 
   // Free users are capped at AI level 3; clamp if they lose Pro mid-session.
   useEffect(() => {
@@ -413,8 +417,8 @@ export default function Home() {
       if (!isPro) {
         const rem = await onlineQuotaRemaining();
         if (rem <= 0) {
-          setOnlineError('Daily free online limit reached — upgrade to Pro.');
-          setShowPro(true);
+          setOnlineError(canUpgrade ? 'Daily free online limit reached — upgrade to Pro.' : 'Daily free online limit reached.');
+          if (canUpgrade) setShowPro(true);
           return;
         }
       }
@@ -609,8 +613,8 @@ export default function Home() {
     if (!isPro) {
       const rem = await onlineQuotaRemaining();
       if (rem <= 0) {
-        setOnlineError('Daily free online limit reached — upgrade to Pro.');
-        setShowPro(true);
+        setOnlineError(canUpgrade ? 'Daily free online limit reached — upgrade to Pro.' : 'Daily free online limit reached.');
+        if (canUpgrade) setShowPro(true);
         return;
       }
     }
@@ -978,7 +982,7 @@ export default function Home() {
                   {isPro ? '⚡ Pro' : ''}
                 </span>
               </div>
-              {!isPro && (
+              {!isPro && canUpgrade && (
                 <button
                   type="button"
                   onClick={() => setShowPro(true)}
@@ -1102,7 +1106,7 @@ export default function Home() {
                     onChange={(e) => setDifficulty(Number(e.target.value))}
                     className="w-full accent-amber-600"
                   />
-                  {!isPro && (
+                  {!isPro && canUpgrade && (
                     <button
                       type="button"
                       onClick={() => setShowPro(true)}
@@ -1207,7 +1211,7 @@ export default function Home() {
         </div>
       </div>
 
-      {showPro && (
+      {showPro && canUpgrade && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-3">
