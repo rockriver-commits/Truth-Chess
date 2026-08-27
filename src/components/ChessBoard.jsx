@@ -20,23 +20,43 @@ function Cross({ color }) {
   );
 }
 
-export default function ChessBoard({ board, selected, legalMoves, lastMove, onSquareClick }) {
+export default function ChessBoard({
+  board,
+  selected,
+  legalMoves,
+  lastMove,
+  onSquareClick,
+  flipped = false,
+  checkSquare = null,
+  hintMove = null,
+}) {
   const destSet = new Set(legalMoves.map((m) => `${m.to[0]},${m.to[1]}`));
   const selKey = selected ? `${selected[0]},${selected[1]}` : null;
   const lastSet = lastMove
     ? new Set([`${lastMove.from[0]},${lastMove.from[1]}`, `${lastMove.to[0]},${lastMove.to[1]}`])
     : new Set();
+  const checkKey = checkSquare ? `${checkSquare[0]},${checkSquare[1]}` : null;
+  const hintSet = hintMove
+    ? new Set([`${hintMove.from[0]},${hintMove.from[1]}`, `${hintMove.to[0]},${hintMove.to[1]}`])
+    : new Set();
+
+  const fileLabels = flipped ? [...FILES].reverse() : FILES;
 
   return (
     <div className="w-full max-w-[620px] mx-auto select-none">
       <div className="grid grid-cols-10 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 bg-stone-100">
-        {board.map((row, r) =>
-          row.map((piece, f) => {
+        {Array.from({ length: 8 }).map((_, di) =>
+          Array.from({ length: 10 }).map((_, dj) => {
+            const r = flipped ? 7 - di : di;
+            const f = flipped ? 9 - dj : dj;
             const dark = (r + f) % 2 === 1;
             const key = `${r},${f}`;
             const isSel = selKey === key;
             const isDest = destSet.has(key);
             const isLast = lastSet.has(key);
+            const isCheck = checkKey === key;
+            const isHint = hintSet.has(key);
+            const piece = board[r][f];
             return (
               <button
                 key={key}
@@ -47,8 +67,21 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
                   dark ? 'bg-stone-300' : 'bg-stone-50',
                   isLast && !isSel ? 'bg-amber-200/70' : '',
                   isSel ? 'bg-amber-300/90' : '',
+                  isCheck ? 'bg-rose-400/60' : '',
                 ].join(' ')}
               >
+                {dj === 0 && (
+                  <span
+                    className={`absolute top-0.5 left-1 text-[0.55rem] font-semibold ${
+                      dark ? 'text-stone-50/80' : 'text-stone-400'
+                    }`}
+                  >
+                    {8 - r}
+                  </span>
+                )}
+                {isHint && (
+                  <span className="absolute inset-0 ring-2 ring-emerald-500/70 rounded-sm pointer-events-none" />
+                )}
                 {piece &&
                   (piece.type === 'T' ? (
                     <Cross color={piece.color} />
@@ -68,16 +101,14 @@ export default function ChessBoard({ board, selected, legalMoves, lastMove, onSq
                     </span>
                   ))}
                 {isDest && !piece && <span className="absolute w-1/3 h-1/3 rounded-full bg-emerald-600/40" />}
-                {isDest && piece && (
-                  <span className="absolute inset-1 rounded-full ring-2 ring-emerald-600/60" />
-                )}
+                {isDest && piece && <span className="absolute inset-1 rounded-full ring-2 ring-emerald-600/60" />}
               </button>
             );
           })
         )}
       </div>
       <div className="grid grid-cols-10 mt-1.5">
-        {FILES.map((fl) => (
+        {fileLabels.map((fl) => (
           <div key={fl} className="text-center text-[0.6rem] uppercase tracking-widest text-stone-400">
             {fl}
           </div>

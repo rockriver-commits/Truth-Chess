@@ -1,19 +1,29 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ChessBoard from '@/components/ChessBoard';
 import {
   initialState,
   legalMovesFor,
   gameStatus,
   makeMove,
+  findKing,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import { generateCode, replayGame, serializeMove } from '@/lib/onlineGame';
+import { moveToSAN, movesToSAN, classifyMove } from '@/lib/chessNotation';
+import { useChessSounds } from '@/hooks/useChessSounds';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import OnlinePanel from '@/components/OnlinePanel';
 import Leaderboard from '@/components/Leaderboard';
+import MoveHistory from '@/components/MoveHistory';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${m}:${String(ss).padStart(2, '0')}`;
+}
 
 export default function Home() {
   const [mode, setMode] = useState('local'); // 'local' | 'computer' | 'online'
@@ -29,6 +39,19 @@ export default function Home() {
   const [thinking, setThinking] = useState(false);
   const [history, setHistory] = useState([]);
   const [pendingAdvance, setPendingAdvance] = useState(false);
+
+  // batch-1 additions
+  const [flipped, setFlipped] = useState(false); // manual flip toggle
+  const [autoFlip, setAutoFlip] = useState(true); // 2-player auto-flip
+  const [hint, setHint] = useState(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [resigned, setResigned] = useState(false);
+  const [moveSan, setMoveSan] = useState([]);
+  const [soundOn, setSoundOn] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const [startMs, setStartMs] = useState(Date.now());
+  const prevMovesLen = useRef(0);
+  const playSound = useChessSounds(soundOn);
 
   // online
   const [me, setMe] = useState(null);
@@ -61,7 +84,33 @@ export default function Home() {
   const turn = state?.turn;
 
   const status = useMemo(() => (state ? gameStatus(state) : 'playing'), [state]);
-  const gameOver = status === 'checkmate' || status === 'stalemate';
+  const localOver = mode !== 'online' && resigned;
+  const gameOver = status === 'checkmate' || status === 'stalemate' || localOver;
+
+  const effectiveFlipped = useMemo(() => {
+    if (mode === 'local') return autoFlip ? turn === 'b' : flipped;
+    if (mode === 'online') return myColor === 'b' ? !flipped : flipped;
+    return flipped; // computer
+  }, [mode, autoFlip, turn, flipped, myColor]);
+
+  const checkSquare = useMemo(() => {
+    if (!state) return null;
+    if (status !== 'check' && status !== 'checkmate') return null;
+    return findKing(state.board, state.turn);
+  }, [state, status]);
+
+  const moveSanDisplay = useMemo(() => {
+    if (mode === 'online' && onlineGame) return movesToSAN(onlineGame.moves || []);
+    return moveSan;
+  }, [mode, onlineGame, moveSan]);
+
+  const humanToMove = useMemo(() => {
+    if (!state || gameOver || resigned || submitting || promo) return false;
+    if (mode === 'local') return true;
+    if (mode === 'computer') return turn === 'w';
+    if (mode === 'online') return onlineGame?.status === 'active' && !!myColor && turn === myColor;
+    return false;
+  }, [state, gameOver, resigned, submitting, promo, mode, turn, myColor, onlineGame?.status]);
 
   function handleSquareClick(r, f) {
     if (gameOver || promo || submitting) return;
@@ -84,6 +133,7 @@ export default function Home() {
       if (piece && piece.color === turn) {
         setSelected([r, f]);
         setLegalMoves(legalMovesFor(state, r, f));
+        setHint(null);
         return;
       }
       setSelected(null);
@@ -94,6 +144,7 @@ export default function Home() {
       if (mode === 'online' && piece.color !== myColor) return;
       setSelected([r, f]);
       setLegalMoves(legalMovesFor(state, r, f));
+      setHint(null);
     }
   }
 
@@ -102,18 +153,29 @@ export default function Home() {
       setSelected(null);
       setLegalMoves([]);
       setPromo(null);
+      setHint(null);
       appendMove(serializeMove(move, promoType));
       return;
     }
+    const ns = makeMove(localState, move, promoType);
+    const st = gameStatus(ns);
+    if (st === 'checkmate' || st === 'stalemate') playSound('mate');
+    else if (st === 'check') playSound('check');
+    else if (move.captured) playSound('capture');
+    else playSound('move');
+
+    const san = moveToSAN(localState, move, promoType);
+    setMoveSan((s) => [...s, san]);
     setHistory((h) => [...h, { state: localState, captured: localCaptured, lastMove: localLastMove }]);
     if (move.captured) {
       setLocalCaptured((c) => ({ ...c, [localState.turn]: [...c[localState.turn], move.captured] }));
     }
-    setLocalState((s) => makeMove(s, move, promoType));
+    setLocalState(ns);
     setLocalLastMove(move);
     setSelected(null);
     setLegalMoves([]);
     setPromo(null);
+    setHint(null);
   }
 
   function choosePromo(type) {
@@ -126,11 +188,33 @@ export default function Home() {
     if (history.length < 2) return;
     const target = history[history.length - 2];
     setHistory((h) => h.slice(0, h.length - 2));
+    setMoveSan((s) => s.slice(0, Math.max(0, s.length - 2)));
     setLocalState(target.state);
     setLocalCaptured(target.captured);
     setLocalLastMove(target.lastMove);
     setSelected(null);
     setLegalMoves([]);
+    setHint(null);
+  }
+
+  function resign() {
+    if (mode === 'online') {
+      resignOnline();
+      return;
+    }
+    if (gameOver || resigned) return;
+    setResigned(true);
+    playSound('mate');
+  }
+
+  function showHint() {
+    if (!humanToMove || hintLoading) return;
+    setHintLoading(true);
+    setTimeout(() => {
+      const m = bestMove(state, turn, 5);
+      setHint(m);
+      setHintLoading(false);
+    }, 30);
   }
 
   function resetLocal() {
@@ -143,6 +227,12 @@ export default function Home() {
     setThinking(false);
     setHistory([]);
     setPendingAdvance(false);
+    setHint(null);
+    setHintLoading(false);
+    setResigned(false);
+    setMoveSan([]);
+    setStartMs(Date.now());
+    setElapsed(0);
   }
 
   function changeMode(m) {
@@ -182,6 +272,7 @@ export default function Home() {
         result: null,
         last_move_at: new Date().toISOString(),
       });
+      prevMovesLen.current = 0;
       setOnlineGame(rec);
     } catch (e) {
       setOnlineError('Could not create game.');
@@ -207,6 +298,7 @@ export default function Home() {
       const g = found[0];
       if (g.white_player_id === user.id) {
         setOnlineError('That is your own game — waiting for an opponent.');
+        prevMovesLen.current = g.moves?.length || 0;
         setOnlineGame(g);
         return;
       }
@@ -215,6 +307,7 @@ export default function Home() {
         status: 'active',
         last_move_at: new Date().toISOString(),
       });
+      prevMovesLen.current = 0;
       setOnlineGame(updated);
     } catch (e) {
       setOnlineError('Could not join game.');
@@ -268,6 +361,7 @@ export default function Home() {
     setSubmitting(false);
     setSelected(null);
     setLegalMoves([]);
+    prevMovesLen.current = 0;
     refreshOpenGames();
   }
 
@@ -312,6 +406,7 @@ export default function Home() {
           status: 'active',
           last_move_at: new Date().toISOString(),
         });
+        prevMovesLen.current = 0;
         setOnlineGame(updated);
       } else {
         await createOnline();
@@ -338,6 +433,7 @@ export default function Home() {
         status: 'active',
         last_move_at: new Date().toISOString(),
       });
+      prevMovesLen.current = 0;
       setOnlineGame(updated);
     } catch (e) {
       setOnlineError('Could not join that game.');
@@ -346,6 +442,7 @@ export default function Home() {
 
   function reenterOwn(game) {
     setOnlineError('');
+    prevMovesLen.current = game.moves?.length || 0;
     setOnlineGame(game);
   }
 
@@ -370,6 +467,7 @@ export default function Home() {
         result: null,
         last_move_at: new Date().toISOString(),
       });
+      prevMovesLen.current = 0;
       setGhostOpponent(true);
       setOnlineGame(rec);
     } catch (e) {
@@ -377,13 +475,19 @@ export default function Home() {
     }
   }
 
-  // realtime subscription: active-game updates + live lobby refresh
+  // realtime subscription: active-game updates + live lobby refresh + sounds
   useEffect(() => {
     if (mode !== 'online') return;
     refreshOpenGames();
     const unsub = base44.entities.Game.subscribe((event) => {
       if (!event || !event.data) return;
       if (onlineGame && event.data.id === onlineGame.id) {
+        const newLen = (event.data.moves || []).length;
+        if (newLen > prevMovesLen.current) {
+          const kind = classifyMove(event.data.moves);
+          playSound(kind === 'mate' || kind === 'stale' ? 'mate' : kind);
+          prevMovesLen.current = newLen;
+        }
         setOnlineGame(event.data);
       }
       if (!onlineGame) refreshOpenGames();
@@ -393,6 +497,25 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGame?.id]);
+
+  // start/elapsed clock for an online game once it becomes active
+  useEffect(() => {
+    if (mode === 'online' && onlineGame?.status === 'active') {
+      setStartMs(Date.now());
+      setElapsed(0);
+      prevMovesLen.current = onlineGame.moves?.length || 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, onlineGame?.status, onlineGame?.id]);
+
+  // elapsed timer (ticks while a game is in progress)
+  useEffect(() => {
+    const active = mode === 'online' ? onlineGame?.status === 'active' && !gameOver : !gameOver;
+    if (!active) return undefined;
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startMs, gameOver, mode, onlineGame?.status]);
 
   // computer AI
   useEffect(() => {
@@ -445,13 +568,7 @@ export default function Home() {
     setPendingAdvance(false);
   }
 
-  let statusText = {
-    playing: `${turn === 'w' ? 'White' : 'Black'} to move`,
-    check: `${turn === 'w' ? 'White' : 'Black'} is in check`,
-    checkmate: `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`,
-    stalemate: 'Stalemate — draw',
-  }[status] || 'Loading…';
-  if (thinking) statusText = 'Computer is thinking…';
+  let statusText;
   if (mode === 'online') {
     if (!onlineGame) statusText = 'Create or join a game';
     else if (onlineGame.status === 'waiting') statusText = 'Waiting for opponent…';
@@ -471,8 +588,29 @@ export default function Home() {
         (onlineGame.result === 'black_wins' && myColor === 'b');
       statusText =
         onlineGame.result === 'draw' ? 'Draw' : won ? 'You won!' : 'You lost';
+    } else {
+      statusText = 'Loading…';
+    }
+  } else {
+    if (resigned) {
+      statusText =
+        mode === 'computer'
+          ? 'You resigned — Computer wins'
+          : `${turn === 'w' ? 'Black' : 'White'} wins by resignation`;
+    } else if (state) {
+      statusText = {
+        playing: `${turn === 'w' ? 'White' : 'Black'} to move`,
+        check: `${turn === 'w' ? 'White' : 'Black'} is in check`,
+        checkmate: `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`,
+        stalemate: 'Stalemate — draw',
+      }[status] || 'Loading…';
+      if (thinking) statusText = 'Computer is thinking…';
+    } else {
+      statusText = 'Loading…';
     }
   }
+
+  const showDifficulty = mode === 'computer' || (mode === 'online' && ghostOpponent);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">
@@ -503,9 +641,13 @@ export default function Home() {
                     legalMoves={legalMoves}
                     lastMove={lastMove}
                     onSquareClick={handleSquareClick}
+                    flipped={effectiveFlipped}
+                    checkSquare={checkSquare}
+                    hintMove={hint}
                   />
                 </div>
                 <CapturedRow pieces={captured.b} label="Black has captured" />
+                <MoveHistory sans={moveSanDisplay} />
               </>
             ) : (
               <div className="w-full max-w-[620px] aspect-[10/8] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
@@ -515,6 +657,45 @@ export default function Home() {
           </div>
 
           <aside className="space-y-5">
+            {/* Game controls (all modes) */}
+            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
+                <span className="text-xs font-mono text-stone-500">⏱ {fmtTime(elapsed)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" onClick={() => setFlipped((f) => !f)}>
+                  Flip board
+                </Button>
+                <Button
+                  size="sm"
+                  variant={soundOn ? 'default' : 'outline'}
+                  onClick={() => setSoundOn((s) => !s)}
+                >
+                  {soundOn ? 'Sound On' : 'Sound Off'}
+                </Button>
+                {mode === 'local' && (
+                  <Button
+                    size="sm"
+                    variant={autoFlip ? 'default' : 'outline'}
+                    onClick={() => setAutoFlip((a) => !a)}
+                  >
+                    Auto-flip
+                  </Button>
+                )}
+                {humanToMove && (
+                  <Button size="sm" variant="outline" onClick={showHint} disabled={hintLoading}>
+                    {hintLoading ? 'Thinking…' : 'Hint'}
+                  </Button>
+                )}
+                {(mode === 'local' || mode === 'computer') && !gameOver && (
+                  <Button size="sm" variant="outline" onClick={resign}>
+                    Resign
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
               <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-xl mb-4">
                 <button
@@ -546,7 +727,7 @@ export default function Home() {
                 </button>
               </div>
 
-              {(mode === 'computer' || (mode === 'online' && ghostOpponent)) && (
+              {showDifficulty && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
@@ -638,6 +819,7 @@ export default function Home() {
                     opposing King — it acts as a passive blocker.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
+                  <li>• Use <span className="font-medium text-stone-800">Hint</span> for a suggested move, <span className="font-medium text-stone-800">Flip board</span> to change orientation, and <span className="font-medium text-stone-800">Resign</span> to end the game.</li>
                 </ul>
               </div>
             )}
