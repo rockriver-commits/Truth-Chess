@@ -2,32 +2,90 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-// Matchmaking + in-game status for online play. The board and move handling
-// live in Home; this panel handles create/join, the lobby code, and resign.
+// Online lobby + matchmaking + in-game status. The board and move handling
+// live in Home; this panel handles Quick Match, the live open-games lobby,
+// private host/join-by-code, the waiting room, and resign/leave.
 export default function OnlinePanel({
   onlineGame,
   myColor,
+  myId,
+  openGames,
   statusText,
   onlineError,
+  onQuickMatch,
   onCreate,
-  onJoin,
+  onJoinCode,
+  onJoinGame,
+  onReenterOwn,
   onLeave,
   onResign,
 }) {
   const [code, setCode] = useState('');
 
   if (!onlineGame) {
+    const games = openGames || [];
     return (
-      <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-4">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Play online</p>
-          <Button onClick={onCreate} className="w-full">Create a new game</Button>
+      <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-5">
+        <div className="space-y-1.5">
+          <p className="text-xs uppercase tracking-widest text-stone-400">Play online</p>
+          <Button onClick={onQuickMatch} className="w-full">Quick Match</Button>
+          <p className="text-[0.7rem] text-stone-400">
+            Join an open game, or start a new one if none are waiting.
+          </p>
         </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Open games</p>
+          {games.length === 0 ? (
+            <p className="text-sm text-stone-400">
+              No open games right now. Tap Quick Match to start one.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {games.map((g) => {
+                const mine = g.white_player_id === myId;
+                return (
+                  <div
+                    key={g.id}
+                    className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
+                  >
+                    <span className="font-mono text-sm tracking-widest text-stone-700">
+                      {g.code}
+                      {mine && (
+                        <span className="ml-2 text-[0.6rem] uppercase tracking-wider text-amber-600">
+                          your game
+                        </span>
+                      )}
+                    </span>
+                    {mine ? (
+                      <Button size="sm" variant="outline" onClick={() => onReenterOwn(g)}>
+                        Open
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => onJoinGame(g)}>
+                        Join
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           <div className="h-px bg-stone-200 flex-1" />
-          <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">or</span>
+          <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">or private</span>
           <div className="h-px bg-stone-200 flex-1" />
         </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Host with a code</p>
+          <Button onClick={onCreate} variant="outline" className="w-full">
+            Create a new game
+          </Button>
+        </div>
+
         <div>
           <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Join with a code</p>
           <div className="flex gap-2">
@@ -38,11 +96,12 @@ export default function OnlinePanel({
               maxLength={5}
               className="uppercase tracking-widest font-mono"
             />
-            <Button onClick={() => onJoin(code.trim())} disabled={code.trim().length < 4}>
+            <Button onClick={() => onJoinCode(code.trim())} disabled={code.trim().length < 4}>
               Join
             </Button>
           </div>
         </div>
+
         {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
       </div>
     );

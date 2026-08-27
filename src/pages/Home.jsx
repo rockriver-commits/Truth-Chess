@@ -34,6 +34,7 @@ export default function Home() {
   const [onlineGame, setOnlineGame] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
+  const [openGames, setOpenGames] = useState([]);
 
   useEffect(() => {
     base44.auth.me().then(setMe).catch(() => setMe(null));
@@ -243,12 +244,20 @@ export default function Home() {
     }
   }
 
-  function leaveOnline() {
+  async function leaveOnline() {
+    if (onlineGame && onlineGame.status === 'waiting' && onlineGame.white_player_id === me?.id) {
+      try {
+        await base44.entities.Game.delete(onlineGame.id);
+      } catch {
+        // ignore
+      }
+    }
     setOnlineGame(null);
     setOnlineError('');
     setSubmitting(false);
     setSelected(null);
     setLegalMoves([]);
+    refreshOpenGames();
   }
 
   async function resignOnline() {
@@ -265,13 +274,80 @@ export default function Home() {
     }
   }
 
-  // realtime subscription to the active online game
+  async function refreshOpenGames() {
+    try {
+      const list = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
+      setOpenGames(list || []);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function quickMatch() {
+    setOnlineError('');
+    const user = await ensureUser();
+    if (!user) {
+      setOnlineError('Sign in to play online.');
+      return;
+    }
+    try {
+      const open = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
+      const joinable = (open || []).find(
+        (g) => g.white_player_id !== user.id && !g.black_player_id
+      );
+      if (joinable) {
+        const updated = await base44.entities.Game.update(joinable.id, {
+          black_player_id: user.id,
+          status: 'active',
+          last_move_at: new Date().toISOString(),
+        });
+        setOnlineGame(updated);
+      } else {
+        await createOnline();
+      }
+    } catch (e) {
+      setOnlineError('Matchmaking failed.');
+    }
+  }
+
+  async function joinSpecific(game) {
+    setOnlineError('');
+    const user = await ensureUser();
+    if (!user) {
+      setOnlineError('Sign in to play online.');
+      return;
+    }
+    if (game.white_player_id === user.id) {
+      setOnlineError('That is your own game.');
+      return;
+    }
+    try {
+      const updated = await base44.entities.Game.update(game.id, {
+        black_player_id: user.id,
+        status: 'active',
+        last_move_at: new Date().toISOString(),
+      });
+      setOnlineGame(updated);
+    } catch (e) {
+      setOnlineError('Could not join that game.');
+    }
+  }
+
+  function reenterOwn(game) {
+    setOnlineError('');
+    setOnlineGame(game);
+  }
+
+  // realtime subscription: active-game updates + live lobby refresh
   useEffect(() => {
-    if (mode !== 'online' || !onlineGame) return;
+    if (mode !== 'online') return;
+    refreshOpenGames();
     const unsub = base44.entities.Game.subscribe((event) => {
-      if (event && event.data && event.data.id === onlineGame.id) {
+      if (!event || !event.data) return;
+      if (onlineGame && event.data.id === onlineGame.id) {
         setOnlineGame(event.data);
       }
+      if (!onlineGame) refreshOpenGames();
     });
     return () => {
       if (unsub) unsub();
@@ -477,10 +553,15 @@ export default function Home() {
               <OnlinePanel
                 onlineGame={onlineGame}
                 myColor={myColor}
+                myId={me?.id}
+                openGames={openGames}
                 statusText={statusText}
                 onlineError={onlineError}
+                onQuickMatch={quickMatch}
                 onCreate={createOnline}
-                onJoin={joinOnline}
+                onJoinCode={joinOnline}
+                onJoinGame={joinSpecific}
+                onReenterOwn={reenterOwn}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
               />
