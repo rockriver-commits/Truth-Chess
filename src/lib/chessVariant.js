@@ -1,7 +1,7 @@
-// Chancellor Chess — a 9x8 chess variant.
-// An extra piece, the Truth (T), sits between the Queen and King on the back rank,
-// with a pawn in front of it. Truth moves like a King (one square in any direction),
-// can only capture the opposing King, and cannot be captured by any piece.
+// Truth Chess — a 10x8 chess variant.
+// Back rank: R N B T Q K T B N R. Truth (T) moves like a Queen but never captures
+// and cannot be captured by any piece EXCEPT the opposing King.
+// Castling and en passant are supported. State carries castling rights + ep target.
 
 export const FILES = 10;
 export const RANKS = 8;
@@ -17,6 +17,15 @@ export function initialBoard() {
     board[7][f] = { type: BACK[f], color: 'w' };
   }
   return board;
+}
+
+export function initialState() {
+  return {
+    board: initialBoard(),
+    turn: 'w',
+    castling: { w: { K: true, Q: true }, b: { K: true, Q: true } },
+    ep: null,
+  };
 }
 
 export function cloneBoard(board) {
@@ -56,11 +65,24 @@ const KING_OFFSETS = [
   [-1, -1],
 ];
 
+// Castling definitions for the 10-wide board. King starts on file 5.
+const CASTLE = {
+  w: {
+    K: { kingFrom: [7, 5], kingTo: [7, 7], rookFrom: [7, 9], rookTo: [7, 6], empty: [[7, 6], [7, 7], [7, 8]], pass: [[7, 5], [7, 6], [7, 7]] },
+    Q: { kingFrom: [7, 5], kingTo: [7, 3], rookFrom: [7, 0], rookTo: [7, 4], empty: [[7, 1], [7, 2], [7, 3], [7, 4]], pass: [[7, 5], [7, 4], [7, 3]] },
+  },
+  b: {
+    K: { kingFrom: [0, 5], kingTo: [0, 7], rookFrom: [0, 9], rookTo: [0, 6], empty: [[0, 6], [0, 7], [0, 8]], pass: [[0, 5], [0, 6], [0, 7]] },
+    Q: { kingFrom: [0, 5], kingTo: [0, 3], rookFrom: [0, 0], rookTo: [0, 4], empty: [[0, 1], [0, 2], [0, 3], [0, 4]], pass: [[0, 5], [0, 4], [0, 3]] },
+  },
+};
+
 function inBounds(r, f) {
   return r >= 0 && r < RANKS && f >= 0 && f < FILES;
 }
 
-function pieceMoves(board, r, f) {
+function pieceMoves(state, r, f) {
+  const board = state.board;
   const piece = board[r][f];
   if (!piece) return [];
   const moves = [];
@@ -73,11 +95,9 @@ function pieceMoves(board, r, f) {
       let tf = f + df;
       while (inBounds(tr, tf)) {
         const t = board[tr][tf];
-        if (!t) {
-          add(tr, tf);
-        } else if (t.color === color || t.type === 'T') {
-          break; // blocked by own piece or the uncapturable Truth
-        } else {
+        if (!t) add(tr, tf);
+        else if (t.color === color || t.type === 'T') break; // Truth is never capturable by sliders
+        else {
           add(tr, tf, { captured: t });
           break;
         }
@@ -98,6 +118,18 @@ function pieceMoves(board, r, f) {
     }
   };
 
+  // King may capture any enemy piece, including the enemy Truth.
+  const kingJumps = (offsets) => {
+    for (const [dr, df] of offsets) {
+      const tr = r + dr;
+      const tf = f + df;
+      if (!inBounds(tr, tf)) continue;
+      const t = board[tr][tf];
+      if (!t) add(tr, tf);
+      else if (t.color !== color) add(tr, tf, { captured: t });
+    }
+  };
+
   switch (type) {
     case 'P': {
       const dir = color === 'w' ? -1 : 1;
@@ -114,11 +146,15 @@ function pieceMoves(board, r, f) {
       }
       for (const df of [-1, 1]) {
         const tf = f + df;
-        if (inBounds(tr, tf)) {
-          const t = board[tr][tf];
-          if (t && t.color !== color && t.type !== 'T') {
-            if (tr === promoRank) add(tr, tf, { captured: t, promotion: true });
-            else add(tr, tf, { captured: t });
+        if (!inBounds(tr, tf)) continue;
+        const t = board[tr][tf];
+        if (t && t.color !== color && t.type !== 'T') {
+          if (tr === promoRank) add(tr, tf, { captured: t, promotion: true });
+          else add(tr, tf, { captured: t });
+        } else if (!t && state.ep && state.ep[0] === tr && state.ep[1] === tf) {
+          const cap = board[r][tf];
+          if (cap && cap.color !== color && cap.type === 'P') {
+            add(tr, tf, { ep: true, captured: cap, capturedAt: [r, tf] });
           }
         }
       }
@@ -145,7 +181,7 @@ function pieceMoves(board, r, f) {
           while (inBounds(tr, tf)) {
             const t = board[tr][tf];
             if (!t) add(tr, tf);
-            else break; // blocked by any piece — Truth never captures
+            else break; // Truth never captures
             tr += dr;
             tf += df;
           }
@@ -153,9 +189,28 @@ function pieceMoves(board, r, f) {
       }
       break;
     }
-    case 'K':
-      jumps(KING_OFFSETS);
+    case 'K': {
+      kingJumps(KING_OFFSETS);
+      const rights = state.castling[color];
+      const enemy = color === 'w' ? 'b' : 'w';
+      const kingHere = board[CASTLE[color].K.kingFrom[0]][CASTLE[color].K.kingFrom[1]];
+      if (!kingHere || kingHere.type !== 'K' || kingHere.color !== color) break;
+      const kingRemoved = cloneBoard(board);
+      kingRemoved[CASTLE[color].K.kingFrom[0]][CASTLE[color].K.kingFrom[1]] = null;
+      for (const side of ['K', 'Q']) {
+        if (!rights[side]) continue;
+        const c = CASTLE[color][side];
+        const rook = board[c.rookFrom[0]][c.rookFrom[1]];
+        if (!rook || rook.type !== 'R' || rook.color !== color) continue;
+        let ok = true;
+        for (const [er, ef] of c.empty) if (board[er][ef]) { ok = false; break; }
+        if (!ok) continue;
+        for (const [pr, pf] of c.pass) if (isSquareAttacked(kingRemoved, pr, pf, enemy)) { ok = false; break; }
+        if (!ok) continue;
+        add(c.kingTo[0], c.kingTo[1], { castle: side });
+      }
       break;
+    }
     default:
       break;
   }
@@ -163,7 +218,6 @@ function pieceMoves(board, r, f) {
 }
 
 export function isSquareAttacked(board, r, f, byColor) {
-  // Pawn attacks: white pawn at (r+1, f±1) attacks (r,f); black pawn at (r-1, f±1).
   const pr = byColor === 'w' ? r + 1 : r - 1;
   for (const pf of [f - 1, f + 1]) {
     if (inBounds(pr, pf)) {
@@ -226,49 +280,87 @@ export function findKing(board, color) {
   return null;
 }
 
-export function inCheck(board, color) {
-  const k = findKing(board, color);
+export function inCheck(state, color) {
+  const k = findKing(state.board, color);
   if (!k) return false;
-  return isSquareAttacked(board, k[0], k[1], color === 'w' ? 'b' : 'w');
+  return isSquareAttacked(state.board, k[0], k[1], color === 'w' ? 'b' : 'w');
 }
 
-function applyMove(board, move, promoType = 'Q') {
-  const nb = cloneBoard(board);
+function applyMove(state, move, promoType = 'Q') {
+  const nb = cloneBoard(state.board);
   const [fr, ff] = move.from;
   const [tr, tf] = move.to;
   const piece = nb[fr][ff];
   nb[fr][ff] = null;
   nb[tr][tf] = move.promotion ? { type: promoType, color: piece.color } : piece;
-  return nb;
+
+  if (move.castle) {
+    const c = CASTLE[piece.color][move.castle];
+    const rook = nb[c.rookFrom[0]][c.rookFrom[1]];
+    nb[c.rookFrom[0]][c.rookFrom[1]] = null;
+    nb[c.rookTo[0]][c.rookTo[1]] = rook;
+  }
+  if (move.ep) {
+    nb[move.capturedAt[0]][move.capturedAt[1]] = null;
+  }
+
+  const castling = {
+    w: { ...state.castling.w },
+    b: { ...state.castling.b },
+  };
+  if (piece.type === 'K') {
+    castling[piece.color].K = false;
+    castling[piece.color].Q = false;
+  }
+  if (piece.type === 'R') {
+    for (const side of ['K', 'Q']) {
+      const c = CASTLE[piece.color][side];
+      if (fr === c.rookFrom[0] && ff === c.rookFrom[1]) castling[piece.color][side] = false;
+    }
+  }
+  if (move.captured && move.captured.type === 'R') {
+    const opp = piece.color === 'w' ? 'b' : 'w';
+    for (const side of ['K', 'Q']) {
+      const c = CASTLE[opp][side];
+      if (tr === c.rookFrom[0] && tf === c.rookFrom[1]) castling[opp][side] = false;
+    }
+  }
+
+  let ep = null;
+  if (piece.type === 'P' && Math.abs(tr - fr) === 2) {
+    ep = [(tr + fr) / 2, ff];
+  }
+
+  return { board: nb, turn: piece.color === 'w' ? 'b' : 'w', castling, ep };
 }
 
-export function legalMovesFor(board, r, f, promoType = 'Q') {
-  const piece = board[r][f];
+export function legalMovesFor(state, r, f) {
+  const piece = state.board[r][f];
   if (!piece) return [];
-  return pieceMoves(board, r, f).filter((m) => {
-    const nb = applyMove(board, m, promoType);
-    return !inCheck(nb, piece.color);
+  return pieceMoves(state, r, f).filter((m) => {
+    const ns = applyMove(state, m, 'Q');
+    return !inCheck(ns, piece.color);
   });
 }
 
-export function allLegalMoves(board, color, promoType = 'Q') {
+export function allLegalMoves(state, color) {
   const moves = [];
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
-      const p = board[r][f];
-      if (p && p.color === color) moves.push(...legalMovesFor(board, r, f, promoType));
+      const p = state.board[r][f];
+      if (p && p.color === color) moves.push(...legalMovesFor(state, r, f));
     }
   }
   return moves;
 }
 
-export function gameStatus(board, turn) {
-  const moves = allLegalMoves(board, turn);
-  const checked = inCheck(board, turn);
+export function gameStatus(state) {
+  const moves = allLegalMoves(state, state.turn);
+  const checked = inCheck(state, state.turn);
   if (moves.length === 0) return checked ? 'checkmate' : 'stalemate';
   return checked ? 'check' : 'playing';
 }
 
-export function makeMove(board, move, promoType = 'Q') {
-  return applyMove(board, move, promoType);
+export function makeMove(state, move, promoType = 'Q') {
+  return applyMove(state, move, promoType);
 }

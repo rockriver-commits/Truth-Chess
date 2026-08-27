@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ChessBoard from '@/components/ChessBoard';
 import {
-  initialBoard,
+  initialState,
   legalMovesFor,
   gameStatus,
   makeMove,
@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
 export default function Home() {
-  const [board, setBoard] = useState(initialBoard);
-  const [turn, setTurn] = useState('w');
+  const [state, setState] = useState(initialState);
+  const board = state.board;
+  const turn = state.turn;
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
   const [captured, setCaptured] = useState({ w: [], b: [] });
@@ -22,7 +23,7 @@ export default function Home() {
   const [vsComputer, setVsComputer] = useState(false);
   const [thinking, setThinking] = useState(false);
 
-  const status = useMemo(() => gameStatus(board, turn), [board, turn]);
+  const status = useMemo(() => gameStatus(state), [state]);
   const gameOver = status === 'checkmate' || status === 'stalemate';
 
   function handleSquareClick(r, f) {
@@ -41,7 +42,7 @@ export default function Home() {
       }
       if (piece && piece.color === turn) {
         setSelected([r, f]);
-        setLegalMoves(legalMovesFor(board, r, f));
+        setLegalMoves(legalMovesFor(state, r, f));
         return;
       }
       setSelected(null);
@@ -50,7 +51,7 @@ export default function Home() {
     }
     if (piece && piece.color === turn) {
       setSelected([r, f]);
-      setLegalMoves(legalMovesFor(board, r, f));
+      setLegalMoves(legalMovesFor(state, r, f));
     }
   }
 
@@ -58,9 +59,8 @@ export default function Home() {
     if (move.captured) {
       setCaptured((c) => ({ ...c, [turn]: [...c[turn], move.captured] }));
     }
-    setBoard((b) => makeMove(b, move, promoType));
+    setState((s) => makeMove(s, move, promoType));
     setLastMove(move);
-    setTurn((t) => (t === 'w' ? 'b' : 'w'));
     setSelected(null);
     setLegalMoves([]);
     setPromo(null);
@@ -72,8 +72,7 @@ export default function Home() {
   }
 
   function reset() {
-    setBoard(initialBoard());
-    setTurn('w');
+    setState(initialState());
     setSelected(null);
     setLegalMoves([]);
     setCaptured({ w: [], b: [] });
@@ -86,7 +85,7 @@ export default function Home() {
     if (!vsComputer || turn !== 'b' || gameOver || promo) return;
     setThinking(true);
     const t = setTimeout(() => {
-      const move = bestMove(board, 'b', 2);
+      const move = bestMove(state, 'b', 2);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 350);
@@ -95,7 +94,7 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vsComputer, turn, gameOver, promo, board]);
+  }, [vsComputer, gameOver, promo, state]);
 
   function setMode(computer) {
     setVsComputer(computer);
@@ -123,7 +122,7 @@ export default function Home() {
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
             A 10×8 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
             flanking the Queen and King, with a pawn in front of every piece. Truth moves like a Queen,
-            cannot capture any piece, and cannot be captured — a passive blocker.
+            cannot capture any piece, and cannot be captured except by the opposing King — a passive blocker.
           </p>
         </header>
 
@@ -192,11 +191,11 @@ export default function Home() {
               <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
               <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                 <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
-                <li>• Standard chess rules apply on a 10-wide board.</li>
+                <li>• Standard chess rules apply on a 10-wide board, including castling and en passant.</li>
                 <li>
                   • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
-                  Queen but cannot capture any piece, and can never be captured — it acts as a passive
-                  blocker.
+                  Queen but cannot capture any piece, and cannot be captured by any piece except the
+                  opposing King — it acts as a passive blocker.
                 </li>
                 <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
               </ul>

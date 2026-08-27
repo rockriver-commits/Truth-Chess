@@ -10,8 +10,8 @@ function evaluate(board) {
       const p = board[r][f];
       if (!p) continue;
       let v = VALUES[p.type];
-      const centerDist = Math.abs(f - 4) + Math.abs(r - 3.5);
-      v += (4 - centerDist) * (p.type === 'P' ? 3 : 1);
+      const centerDist = Math.abs(f - 4.5) + Math.abs(r - 3.5);
+      v += (4.5 - centerDist) * (p.type === 'P' ? 3 : 1);
       if (p.type === 'P') {
         const adv = p.color === 'w' ? 6 - r : r - 1;
         v += adv * 2;
@@ -22,15 +22,15 @@ function evaluate(board) {
   return score;
 }
 
-function negamax(board, color, depth, alpha, beta) {
-  const moves = allLegalMoves(board, color);
-  if (moves.length === 0) return inCheck(board, color) ? -100000 : 0;
-  if (depth === 0) return evaluate(board) * (color === 'w' ? 1 : -1);
+function negamax(state, color, depth, alpha, beta) {
+  const moves = allLegalMoves(state, color);
+  if (moves.length === 0) return inCheck(state, color) ? -100000 : 0;
+  if (depth === 0) return evaluate(state.board) * (color === 'w' ? 1 : -1);
   let best = -Infinity;
   moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
   for (const m of moves) {
-    const nb = makeMove(board, m);
-    const score = -negamax(nb, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha);
+    const ns = makeMove(state, m);
+    const score = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha);
     if (score > best) best = score;
     if (best > alpha) alpha = best;
     if (alpha >= beta) break;
@@ -38,8 +38,8 @@ function negamax(board, color, depth, alpha, beta) {
   return best;
 }
 
-export function bestMove(board, color, depth = 2) {
-  const moves = allLegalMoves(board, color);
+export function bestMove(state, color, depth = 2) {
+  const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
   moves.sort((a, b) => (b.captured ? 1 : 0) - (a.captured ? 1 : 0));
   let best = null;
@@ -47,8 +47,8 @@ export function bestMove(board, color, depth = 2) {
   let alpha = -Infinity;
   const beta = Infinity;
   for (const m of moves) {
-    const nb = makeMove(board, m);
-    const score = -negamax(nb, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha);
+    const ns = makeMove(state, m);
+    const score = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha);
     if (score > bestScore) {
       bestScore = score;
       best = m;
