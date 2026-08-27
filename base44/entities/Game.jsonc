@@ -1,0 +1,97 @@
+{
+  "name": "Game",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_color": {
+      "type": "string",
+      "enum": [
+        "w",
+        "b"
+      ],
+      "default": "w"
+    },
+    "white_player_id": {
+      "type": "string"
+    },
+    "black_player_id": {
+      "type": "string"
+    },
+    "moves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "promotion": {
+            "type": "boolean"
+          },
+          "promoType": {
+            "type": "string",
+            "enum": [
+              "Q",
+              "R",
+              "B",
+              "N"
+            ]
+          },
+          "castle": {
+            "type": "string",
+            "enum": [
+              "K",
+              "Q"
+            ]
+          },
+          "ep": {
+            "type": "boolean"
+          },
+          "capturedAt": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "default": []
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "white_wins",
+        "black_wins",
+        "draw"
+      ]
+    },
+    "last_move_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "code",
+    "status"
+  ]
+}
