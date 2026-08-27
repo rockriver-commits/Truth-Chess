@@ -9,11 +9,13 @@ function Cross({ color }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="w-[55%] h-[55%]"
+      className="w-[60%] h-[60%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
-      <rect x="10" y="2" width="4" height="20" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      <polygon points="5,23 19,23 12,15" fill={fill} stroke={stroke} strokeWidth="0.6" strokeLinejoin="round" />
+      <rect x="10" y="2" width="4" height="13" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
       <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      <circle cx="12" cy="8.5" r="1.4" fill="#facc15" stroke={stroke} strokeWidth="0.3" />
     </svg>
   );
 }
