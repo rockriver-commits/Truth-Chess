@@ -26,6 +26,7 @@ import StatsPanel from '@/components/StatsPanel';
 import { isMobileApp } from '@/lib/isMobileApp';
 import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
+import GameOverBanner from '@/components/GameOverBanner';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -926,6 +927,15 @@ export default function Home() {
 
   const showDifficulty = mode === 'computer' || (mode === 'online' && ghostOpponent);
 
+  const banner = useMemo(() => {
+    if (status === 'checkmate') return { title: 'Checkmate', subtitle: `${turn === 'w' ? 'Black' : 'White'} wins` };
+    if (status === 'stalemate') return { title: 'Stalemate', subtitle: 'Draw' };
+    if (status === 'fifty_move') return { title: 'Draw', subtitle: '50-move rule' };
+    if (threefold) return { title: 'Draw', subtitle: 'Threefold repetition' };
+    if (drawAgreed) return { title: 'Draw', subtitle: 'By agreement' };
+    return null;
+  }, [status, turn, threefold, drawAgreed]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">
       <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
@@ -1004,20 +1014,23 @@ export default function Home() {
                 )}
                 <CapturedRow pieces={viewCaptured.w} label="White has captured" />
                 <div className="my-3 w-full flex justify-center">
-                  <ChessBoard
-                    board={viewState.board}
-                    selected={reviewing ? null : selected}
-                    legalMoves={reviewing ? [] : legalMoves}
-                    lastMove={viewLastMove}
-                    onSquareClick={handleSquareClick}
-                    onDropMove={handleDropMove}
-                    animateMove={animateMove}
-                    flipped={effectiveFlipped}
-                    checkSquare={viewCheck}
-                    hintMove={reviewing ? null : hint}
-                    boardTheme={boardTheme}
-                    pieceStyle={pieceStyle}
-                  />
+                  <div className="relative w-full max-w-[620px]">
+                    <ChessBoard
+                      board={viewState.board}
+                      selected={reviewing ? null : selected}
+                      legalMoves={reviewing ? [] : legalMoves}
+                      lastMove={viewLastMove}
+                      onSquareClick={handleSquareClick}
+                      onDropMove={handleDropMove}
+                      animateMove={animateMove}
+                      flipped={effectiveFlipped}
+                      checkSquare={viewCheck}
+                      hintMove={reviewing ? null : hint}
+                      boardTheme={boardTheme}
+                      pieceStyle={pieceStyle}
+                    />
+                    {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+                  </div>
                 </div>
                 <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
                 <div className="w-full max-w-[620px] mx-auto mt-1 flex items-center justify-between gap-3">
