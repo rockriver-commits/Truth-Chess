@@ -73,6 +73,7 @@ function evaluate(board) {
   let wMat = 0, bMat = 0, wMaj = 0, bMaj = 0;
   let wK = null, bK = null;
   const wT = [], bT = [];
+  const wPc = [], bPc = []; // opponent targets for Truth blockades (non-K, non-T)
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
@@ -80,6 +81,7 @@ function evaluate(board) {
       const pos = [r, f];
       if (p.type === 'K') { if (p.color === 'w') wK = pos; else bK = pos; continue; }
       if (p.type === 'T') { (p.color === 'w' ? wT : bT).push(pos); }
+      else { (p.color === 'w' ? wPc : bPc).push({ pos, type: p.type }); }
       const val = VALUES[p.type];
       if (p.color === 'w') { wMat += val; if (p.type === 'Q' || p.type === 'R') wMaj++; }
       else { bMat += val; if (p.type === 'Q' || p.type === 'R') bMaj++; }
@@ -156,6 +158,41 @@ function evaluate(board) {
   // retains the firepower to force checkmate rather than trading to a draw.
   if (wMat - bMat > 100) score += wMaj * 6;
   else if (bMat - wMat > 100) score -= bMaj * 6;
+
+  // --- Truth blockade -----------------------------------------------------
+  // Truth pieces are passive blockers (uncapturable except by the enemy King),
+  // so the engine should use them to cramp the opponent: sit in front of the
+  // opponent's valuable pieces to deny them development and advanced squares,
+  // and push into the opponent's half to blockade the center. Strongest in the
+  // opening, where blocking setups matters most.
+  {
+    const opWeight = 1 - egPhase * 0.6; // opening → ~1, deep endgame → ~0.4
+    const opPhase = 1 - egPhase;
+    for (const t of wT) {
+      for (const e of bPc) {
+        const d = chebyshev(t, e.pos);
+        if (d === 0 || d > 3) continue;
+        const val = VALUES[e.type] / 100;
+        const forward = t[0] > e.pos[0] ? 1 : 0; // below (white-side of) the black piece
+        score += opWeight * (4 - d) * val * (forward ? 2 : 0.5);
+      }
+      const oppSide = t[0] < rc ? 1 : 0; // in black's half
+      const central = 4.5 - Math.abs(t[1] - fc);
+      score += opPhase * oppSide * central * 3;
+    }
+    for (const t of bT) {
+      for (const e of wPc) {
+        const d = chebyshev(t, e.pos);
+        if (d === 0 || d > 3) continue;
+        const val = VALUES[e.type] / 100;
+        const forward = t[0] < e.pos[0] ? 1 : 0; // above (black-side of) the white piece
+        score -= opWeight * (4 - d) * val * (forward ? 2 : 0.5);
+      }
+      const oppSide = t[0] > rc ? 1 : 0; // in white's half
+      const central = 4.5 - Math.abs(t[1] - fc);
+      score -= opPhase * oppSide * central * 3;
+    }
+  }
 
   return score;
 }
