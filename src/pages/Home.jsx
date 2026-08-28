@@ -24,6 +24,7 @@ import ThemePicker from '@/components/ThemePicker';
 import ClockBar from '@/components/ClockBar';
 import StatsPanel from '@/components/StatsPanel';
 import { isMobileApp } from '@/lib/isMobileApp';
+import CheckmateEstimate from '@/components/CheckmateEstimate';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -1066,6 +1067,7 @@ export default function Home() {
                   />
                 </div>
                 <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
+                <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
                 {gameOver && positionList.length > 1 && (
                   <ReplayBar
