@@ -199,6 +199,7 @@ export default function Home() {
 
   function handleSquareClick(r, f) {
     if (reviewing || gameOver || promo || submitting) return;
+    if (mode === 'cvc') return;
     if (mode === 'computer' && turn === 'b') return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active') return;
@@ -235,6 +236,7 @@ export default function Home() {
 
   function handleDropMove(from, to) {
     if (reviewing || gameOver || promo || submitting) return;
+    if (mode === 'cvc') return;
     if (mode === 'computer' && turn === 'b') return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active' || !myColor || turn !== myColor) return;
@@ -798,6 +800,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, gameOver, promo, localState, difficulty, turn]);
 
+  // computer vs computer: both sides auto-play at level 6
+  useEffect(() => {
+    if (mode !== 'cvc' || gameOver || promo) return;
+    setThinking(true);
+    const t = setTimeout(() => {
+      const move = bestMove(localState, localState.turn, 6);
+      if (move) commitMove(move, 'Q');
+      setThinking(false);
+    }, 500);
+    return () => {
+      clearTimeout(t);
+      setThinking(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, gameOver, promo, localState, turn]);
+
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
     if (mode !== 'online' || !ghostOpponent || !onlineGame || onlineGame.status !== 'active') return;
@@ -922,7 +940,7 @@ export default function Home() {
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
             <div className="w-full max-w-[620px] mb-3">
-              <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-xl">
+              <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 rounded-xl">
                 <button
                   type="button"
                   onClick={() => changeMode('local')}
@@ -949,6 +967,15 @@ export default function Home() {
                   }`}
                 >
                   Online
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode('cvc')}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    mode === 'cvc' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  AI vs AI
                 </button>
               </div>
             </div>
