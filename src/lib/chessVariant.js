@@ -1,6 +1,7 @@
 // Truth Chess — a 10x9 chess variant.
 // Back rank: R N B T Q K T B N R. Truth (T) moves like a Queen but never captures
-// and cannot be captured by any piece EXCEPT the opposing King.
+// and cannot be captured by any piece EXCEPT the opposing King. Although it cannot
+// capture, it controls the squares it slides to, so it can deliver check & checkmate.
 // Castling and en passant are supported. State carries castling rights + ep target.
 // White occupies ranks 1-2 (rows 8-7), Black occupies ranks 8-9 (rows 1-0);
 // ranks 3-7 (rows 6-2) are an empty buffer — armies start five ranks apart.
@@ -244,13 +245,16 @@ export function isSquareAttacked(board, r, f, byColor) {
       if (t && t.color === byColor && t.type === 'K') return true;
     }
   }
+  // Truth (T) moves like a Queen — it slides along rook and bishop rays and,
+  // although it never captures, it controls those squares and can therefore
+  // deliver check (and checkmate) to the opposing King.
   for (const [dr, df] of ROOK_DIRS) {
     let tr = r + dr;
     let tf = f + df;
     while (inBounds(tr, tf)) {
       const t = board[tr][tf];
       if (t) {
-        if (t.color === byColor && (t.type === 'R' || t.type === 'Q')) return true;
+        if (t.color === byColor && (t.type === 'R' || t.type === 'Q' || t.type === 'T')) return true;
         break;
       }
       tr += dr;
@@ -263,7 +267,7 @@ export function isSquareAttacked(board, r, f, byColor) {
     while (inBounds(tr, tf)) {
       const t = board[tr][tf];
       if (t) {
-        if (t.color === byColor && (t.type === 'B' || t.type === 'Q')) return true;
+        if (t.color === byColor && (t.type === 'B' || t.type === 'Q' || t.type === 'T')) return true;
         break;
       }
       tr += dr;

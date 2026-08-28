@@ -1236,7 +1236,8 @@ export default function Home() {
                   <li>
                     • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
                     Queen but cannot capture any piece, and cannot be captured by any piece except the
-                    opposing King — it acts as a passive blocker.
+                    opposing King — it acts as a passive blocker. Although it cannot capture, it controls the
+                    squares it slides to, so it can deliver check and checkmate.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
                   <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>
