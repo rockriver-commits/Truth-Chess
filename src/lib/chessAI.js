@@ -24,11 +24,11 @@ export const DIFFICULTIES = {
   1: { depth: 1, randomness: 0.60, quiescence: false, timeMs: 250 },
   2: { depth: 1, randomness: 0.25, quiescence: false, timeMs: 350 },
   3: { depth: 2, randomness: 0.15, quiescence: false, timeMs: 600 },
-  4: { depth: 2, randomness: 0.00, quiescence: true,  timeMs: 850 },
-  5: { depth: 3, randomness: 0.00, quiescence: true,  timeMs: 1100 },
-  6: { depth: 3, randomness: 0.00, quiescence: true,  timeMs: 1500 },
-  7: { depth: 4, randomness: 0.00, quiescence: true,  timeMs: 1900 },
-  8: { depth: 4, randomness: 0.00, quiescence: true,  timeMs: 2500 },
+  4: { depth: 3, randomness: 0.00, quiescence: true,  timeMs: 850 },
+  5: { depth: 6, randomness: 0.00, quiescence: true,  timeMs: 1200 },
+  6: { depth: 10, randomness: 0.00, quiescence: true,  timeMs: 1800 },
+  7: { depth: 15, randomness: 0.00, quiescence: true,  timeMs: 2500 },
+  8: { depth: 15, randomness: 0.00, quiescence: true,  timeMs: 4500 },
 };
 
 // --- Zobrist hashing for the transposition table ---------------------------
