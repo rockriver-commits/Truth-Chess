@@ -298,6 +298,26 @@ export default function Home() {
     commitMove(promo.move, type);
   }
 
+  // If `move` would repeat a position for the 3rd time (threefold), fall back to
+  // the first legal move that doesn't. Used for the computer and AI-vs-AI
+  // engines so they never trigger a threefold draw; human moves are unaffected.
+  function pickNonRepeating(state, move, moves) {
+    const keys = [positionKey(initialState())];
+    let st = initialState();
+    for (const m of moves) {
+      st = makeMove(st, m, m.promoType || 'Q');
+      keys.push(positionKey(st));
+    }
+    const occ = (k) => keys.reduce((n, hk) => (hk === k ? n + 1 : n), 0);
+    const ck = positionKey(makeMove(state, move, move.promotion ? 'Q' : 'Q'));
+    if (occ(ck) < 2) return move;
+    const safe = allLegalMoves(state, state.turn).find((am) => {
+      const ak = positionKey(makeMove(state, am, am.promotion ? 'Q' : 'Q'));
+      return occ(ak) < 2;
+    });
+    return safe || move;
+  }
+
   function undo() {
     if (mode !== 'computer' || thinking || promo || gameOver) return;
     if (history.length < 2) return;
@@ -791,7 +811,8 @@ export default function Home() {
     if (mode !== 'computer' || turn !== 'b' || gameOver || promo) return;
     setThinking(true);
     const t = setTimeout(() => {
-      const move = bestMove(localState, 'b', difficulty);
+      let move = bestMove(localState, 'b', difficulty);
+      if (move) move = pickNonRepeating(localState, move, localMoves);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 350);
@@ -800,34 +821,16 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, difficulty, turn]);
+  }, [mode, gameOver, promo, localState, difficulty, turn, localMoves]);
 
-  // computer vs computer: both sides auto-play at level 6
+  // computer vs computer: both sides auto-play at level 6, aggressively
+  // pursuing checkmate and never allowing threefold repetition.
   useEffect(() => {
     if (mode !== 'cvc' || gameOver || promo) return;
     setThinking(true);
     const t = setTimeout(() => {
-      let move = bestMove(localState, localState.turn, 6);
-      // Disallow threefold repetition: if the chosen move would repeat a
-      // position for the 3rd time, fall back to the first legal move that
-      // doesn't (so the exhibition game keeps progressing).
-      if (move) {
-        const historyKeys = [positionKey(initialState())];
-        let st = initialState();
-        for (const m of localMoves) {
-          st = makeMove(st, m, m.promoType || 'Q');
-          historyKeys.push(positionKey(st));
-        }
-        const occOf = (k) => historyKeys.reduce((n, hk) => (hk === k ? n + 1 : n), 0);
-        const chosenKey = positionKey(makeMove(localState, move, 'Q'));
-        if (occOf(chosenKey) >= 2) {
-          const safe = allLegalMoves(localState, localState.turn).find((am) => {
-            const ak = positionKey(makeMove(localState, am, am.promotion ? 'Q' : 'Q'));
-            return occOf(ak) < 2;
-          });
-          if (safe) move = safe;
-        }
-      }
+      let move = bestMove(localState, localState.turn, 6, true);
+      if (move) move = pickNonRepeating(localState, move, localMoves);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 2000);

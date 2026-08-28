@@ -100,6 +100,8 @@ function orderMoves(moves) {
 let deadline = 0;
 let timedOut = false;
 let useQuiescence = true;
+let aggressive = false;
+const CHECK_BONUS = 30;
 const TT = new Map();
 const FLAG = { EXACT: 0, LOWER: 1, UPPER: 2 };
 const now = () => performance.now();
@@ -154,6 +156,7 @@ function negamax(state, color, depth, alpha, beta, ply) {
     const ns = makeMove(state, m);
     const sc = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha, ply + 1);
     if (timedOut) break;
+    if (aggressive && inCheck(ns, color === 'w' ? 'b' : 'w')) sc += CHECK_BONUS;
     if (sc > best) { best = sc; bestMove = m; }
     if (best > alpha) { alpha = best; flag = FLAG.EXACT; }
     if (alpha >= beta) { flag = FLAG.LOWER; break; }
@@ -164,9 +167,10 @@ function negamax(state, color, depth, alpha, beta, ply) {
   return best;
 }
 
-export function bestMove(state, color, difficulty = 4) {
+export function bestMove(state, color, difficulty = 4, aggressiveMode = false) {
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES[4];
   useQuiescence = cfg.quiescence;
+  aggressive = aggressiveMode;
   deadline = now() + cfg.timeMs;
   timedOut = false;
   TT.clear();
@@ -188,7 +192,8 @@ export function bestMove(state, color, difficulty = 4) {
     let curBestScore = -Infinity;
     for (const m of ordered) {
       const ns = makeMove(state, m);
-      const sc = -negamax(ns, color === 'w' ? 'b' : 'w', d - 1, -Infinity, -alpha, 1);
+      let sc = -negamax(ns, color === 'w' ? 'b' : 'w', d - 1, -Infinity, -alpha, 1);
+      if (aggressive && inCheck(ns, color === 'w' ? 'b' : 'w')) sc += CHECK_BONUS;
       if (timedOut && d > 1) break;
       if (sc > curBestScore) { curBestScore = sc; curBest = m; }
       if (curBestScore > alpha) alpha = curBestScore;
