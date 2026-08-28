@@ -921,6 +921,37 @@ export default function Home() {
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
+            <div className="w-full max-w-[620px] mb-3">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => changeMode('local')}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    mode === 'local' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  2 Players
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode('computer')}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    mode === 'computer' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  vs Computer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode('online')}
+                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                    mode === 'online' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  Online
+                </button>
+              </div>
+            </div>
             {state ? (
               <>
                 {mode !== 'online' && timeControl !== 'unlimited' && (
@@ -1059,36 +1090,6 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
-              <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-xl mb-4">
-                <button
-                  type="button"
-                  onClick={() => changeMode('local')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
-                    mode === 'local' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  2 Players
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('computer')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
-                    mode === 'computer' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  vs Computer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('online')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
-                    mode === 'online' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  Online
-                </button>
-              </div>
-
               {showDifficulty && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1">
