@@ -12,7 +12,7 @@ import {
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { randomOpening, bookMove } from '@/lib/openings';
-import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
+import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import ClockBar from '@/components/ClockBar';
 import StatsPanel from '@/components/StatsPanel';
 import { isMobileApp } from '@/lib/isMobileApp';
 import CheckmateEstimate from '@/components/CheckmateEstimate';
+import ShareMoves from '@/components/ShareMoves';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -77,7 +78,6 @@ export default function Home() {
   const [localMoves, setLocalMoves] = useState([]);
   const [drawAgreed, setDrawAgreed] = useState(false);
   const [reviewIdx, setReviewIdx] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [boardTheme, setBoardTheme] = useState(() => localStorage.getItem('tc-board-theme') || 'classic');
   const [pieceStyle, setPieceStyle] = useState(() => localStorage.getItem('tc-piece-style') || 'figurine');
   const [timeControl, setTimeControl] = useState('unlimited');
@@ -365,18 +365,6 @@ export default function Home() {
     }, 30);
   }
 
-  async function copyPGN() {
-    if (!moveSanDisplay.length) return;
-    const pgn = toPGN(moveSanDisplay, resultStr);
-    try {
-      await navigator.clipboard.writeText(pgn);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable
-    }
-  }
-
   function resetLocal() {
     setLocalState(initialState());
     setSelected(null);
@@ -394,7 +382,6 @@ export default function Home() {
     setTimedOut(null);
     setLocalMoves([]);
     setReviewIdx(null);
-    setCopied(false);
     const tc = TIME_CONTROLS[timeControl];
     setWhiteClock(tc.initial);
     setBlackClock(tc.initial);
@@ -1051,6 +1038,9 @@ export default function Home() {
                 </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
+                {moveSanDisplay.length > 0 && (
+                  <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
+                )}
                 {gameOver && positionList.length > 1 && (
                   <ReplayBar
                     index={reviewIdx}
@@ -1134,11 +1124,6 @@ export default function Home() {
                 {mode === 'local' && !gameOver && (
                   <Button size="sm" variant="outline" onClick={offerDraw}>
                     Draw
-                  </Button>
-                )}
-                {moveSanDisplay.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={copyPGN} className="col-span-2">
-                    {copied ? 'Copied!' : 'Copy PGN'}
                   </Button>
                 )}
               </div>
@@ -1232,7 +1217,7 @@ export default function Home() {
                     opposing King — it acts as a passive blocker.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
-                  <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy PGN</span> to export the game.</li>
+                  <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>
                 </ul>
               </div>
             )}
