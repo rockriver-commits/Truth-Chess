@@ -14,7 +14,7 @@ const AGGRO_KEY = 'tc-ai-aggression';
 
 // Opening targeting config.
 export const OPENING_PLIES = 20; // first 10 full moves
-const OPENING_CHANCE = 0.5; // >= 46% of games activate targeting
+const OPENING_CHANCE = 0.46; // exactly 46% of games activate targeting
 const TARGET_TYPES = ['R', 'N', 'N', 'B', 'Q', 'T']; // weighted toward R/N
 
 // ---------------------------------------------------------------------------
