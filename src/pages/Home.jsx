@@ -1000,7 +1000,7 @@ export default function Home() {
                     mode === 'cvc_turbo' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
                   }`}
                 >
-                  AI vs AI ⚡
+                  Turbo <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}>⚡</span>
                 </button>
               </div>
               {mode !== 'online' && (
