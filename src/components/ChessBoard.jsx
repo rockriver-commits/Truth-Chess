@@ -154,7 +154,7 @@ export default function ChessBoard({
                     onDropMove([fr, ff], [r, f]);
                   }}
                   className="relative aspect-square flex items-center justify-center transition-colors duration-150"
-                  style={{ backgroundColor: bg }}
+                  style={{ background: bg }}
                 >
                   {dj === 0 && (
                     <span

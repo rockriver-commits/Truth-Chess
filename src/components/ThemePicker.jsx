@@ -3,16 +3,16 @@ import React from 'react';
 // Board color themes + piece glyph style picker. Persisted by the parent via
 // localStorage. Inline to keep the Game controls card self-contained.
 const BOARD_THEMES = {
-  classic: { light: '#fafaf9', dark: '#d6d3d1', name: 'Classic' },
   walnut: { light: '#f0e6d2', dark: '#b08765', name: 'Walnut' },
   green: { light: '#eeeed2', dark: '#769656', name: 'Green' },
-  blue: { light: '#dee3e6', dark: '#8ca2ad', name: 'Blue' },
+  purple: { light: '#ede9fe', dark: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', name: 'Purple' },
+  violet: { light: '#f5f3ff', dark: 'linear-gradient(135deg, #a855f7, #7e22ce)', name: 'Violet' },
 };
 
 export const BOARD_THEME_KEYS = Object.keys(BOARD_THEMES);
 
 export function getBoardTheme(key) {
-  return BOARD_THEMES[key] || BOARD_THEMES.classic;
+  return BOARD_THEMES[key] || BOARD_THEMES.walnut;
 }
 
 export default function ThemePicker({ boardTheme, pieceStyle, onBoardTheme, onPieceStyle }) {
@@ -33,8 +33,8 @@ export default function ThemePicker({ boardTheme, pieceStyle, onBoardTheme, onPi
                 title={t.name}
               >
                 <div className="h-5 w-full rounded overflow-hidden flex">
-                  <div className="flex-1" style={{ backgroundColor: t.light }} />
-                  <div className="flex-1" style={{ backgroundColor: t.dark }} />
+                  <div className="flex-1" style={{ background: t.light }} />
+                  <div className="flex-1" style={{ background: t.dark }} />
                 </div>
               </button>
             );

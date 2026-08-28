@@ -1015,9 +1015,17 @@ export default function Home() {
             Truth Chess
           </h1>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
-            A 10×9 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
-            flanking the Queen and King, with a pawn in front of every piece. Truth moves like a Queen,
-            captures only the opposing Truth, and is captured only by the opposing King or an opposing Truth.
+            On a ten×9 board with a piece that seeks Truth from the king{' '}
+            <span className="inline-flex align-middle mx-0.5" title="Truth piece">
+              <svg viewBox="0 0 24 24" width="16" height="16" style={{ display: 'inline-block' }}>
+                <polygon points="5,23 19,23 12,15" fill="#1f2937" />
+                <rect x="10" y="0" width="4" height="23" rx="1.5" fill="#1f2937" />
+                <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill="#1f2937" />
+                <circle cx="12" cy="8.5" r="2.6" fill="#facc15" />
+              </svg>
+            </span>
+            , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
+            truth pieces and put the king in Check.
           </p>
         </header>
 
@@ -1071,13 +1079,6 @@ export default function Home() {
                   AI vs AI Turbo <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}>⚡</span>
                 </button>
               </div>
-              {mode !== 'online' && (
-                <div className="flex justify-end">
-                  <Button onClick={resetLocal} variant="outline" size="sm">
-                    Reset Game
-                  </Button>
-                </div>
-              )}
             </div>
             {state ? (
               <>
@@ -1118,13 +1119,20 @@ export default function Home() {
                   >
                     {statusText}
                   </p>
-                  <Button
-                    size="sm"
-                    variant={soundOn ? 'default' : 'outline'}
-                    onClick={() => setSoundOn((s) => !s)}
-                  >
-                    {soundOn ? 'Sound On' : 'Sound Off'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {mode !== 'online' && (
+                      <Button size="sm" variant="outline" onClick={resetLocal}>
+                        Reset
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant={soundOn ? 'default' : 'outline'}
+                      onClick={() => setSoundOn((s) => !s)}
+                    >
+                      {soundOn ? 'Sound On' : 'Sound Off'}
+                    </Button>
+                  </div>
                 </div>
                 <div className="w-full max-w-[620px] mx-auto mt-2">
                   <ThemePicker
@@ -1136,9 +1144,7 @@ export default function Home() {
                 </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
-                {moveSanDisplay.length > 0 && (
-                  <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
-                )}
+                <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
                 {gameOver && positionList.length > 1 && (
                   <ReplayBar
                     index={reviewIdx}

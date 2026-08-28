@@ -6,9 +6,7 @@ import { toPGN } from '@/lib/chessNotation';
 // client with the PGN prefilled so they can address it to themselves.
 export default function ShareMoves({ sans, resultStr }) {
   const [copied, setCopied] = useState(false);
-  if (!sans || sans.length === 0) return null;
-
-  const pgn = toPGN(sans, resultStr || '*');
+  const pgn = toPGN(sans || [], resultStr || '*');
 
   async function copy() {
     try {
