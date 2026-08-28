@@ -808,7 +808,7 @@ export default function Home() {
       const move = bestMove(localState, localState.turn, 6);
       if (move) commitMove(move, 'Q');
       setThinking(false);
-    }, 500);
+    }, 2000);
     return () => {
       clearTimeout(t);
       setThinking(false);
