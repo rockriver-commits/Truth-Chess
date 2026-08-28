@@ -844,7 +844,7 @@ export default function Home() {
       if (scripted) {
         move = scripted;
       } else {
-        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 6, true);
+        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 7, true);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');

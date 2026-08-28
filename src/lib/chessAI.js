@@ -47,16 +47,58 @@ function hashState(board, turn) {
 }
 
 // --- Evaluation -----------------------------------------------------------
+// Truth Chess-aware evaluation. Beyond material it includes:
+//  • A middlegame king-safety term (edge penalty + pawn shield) that fades as
+//    the endgame phase is reached.
+//  • An endgame king-activity term: the winning side centralizes its king,
+//    drives the enemy king toward the edge/corner, and brings its own king
+//    close to support the mate.
+//  • A Truth-hunt term: because a Truth (T) piece can only be captured by the
+//    opposing King, the engine is rewarded for maneuvering its King toward the
+//    enemy's Truth pieces so it can capture them — the signature mechanic of
+//    Truth Chess.
+//  • A contempt term: the side with a material lead is rewarded for retaining
+//    major pieces (Q/R), so it keeps the firepower to force mate instead of
+//    trading down to a sterile draw.
+function chebyshev(a, b) {
+  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+}
+
 function evaluate(board) {
   let score = 0;
-  const fileCenter = (FILES - 1) / 2; // 4.5
-  const rankCenter = (RANKS - 1) / 2; // 4
+  const fc = (FILES - 1) / 2; // 4.5
+  const rc = (RANKS - 1) / 2; // 4
+
+  // First pass: gather phase info (kings, truth pieces, material, majors).
+  let wMat = 0, bMat = 0, wMaj = 0, bMaj = 0;
+  let wK = null, bK = null;
+  const wT = [], bT = [];
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = board[r][f];
+      if (!p) continue;
+      const pos = [r, f];
+      if (p.type === 'K') { if (p.color === 'w') wK = pos; else bK = pos; continue; }
+      if (p.type === 'T') { (p.color === 'w' ? wT : bT).push(pos); }
+      const val = VALUES[p.type];
+      if (p.color === 'w') { wMat += val; if (p.type === 'Q' || p.type === 'R') wMaj++; }
+      else { bMat += val; if (p.type === 'Q' || p.type === 'R') bMaj++; }
+    }
+  }
+
+  // Endgame phase: 0 (opening) → 1 (deep endgame). ~2600 ≈ two rooks + minor.
+  const totalMat = wMat + bMat;
+  const eg = totalMat >= 2600 ? 0 : (2600 - totalMat) / 2600;
+  const egPhase = eg > 1 ? 1 : eg;
+  const mg = 1 - egPhase;
+
+  // Second pass: per-piece value with phase-weighted king terms.
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
       if (!p) continue;
       let v = VALUES[p.type];
-      const centerDist = Math.abs(f - fileCenter) + Math.abs(r - rankCenter);
+      const centerDist = Math.abs(f - fc) + Math.abs(r - rc);
       const centerness = 4.5 - centerDist;
       if (p.type === 'N' || p.type === 'B') v += centerness * 3;
       else if (p.type === 'P') v += centerness * 4;
@@ -67,7 +109,7 @@ function evaluate(board) {
         v += adv * 4;
       }
       if (p.type === 'K') {
-        if (f <= 1 || f >= 8) v -= 18; // discourage edge castling-averse king
+        if (f <= 1 || f >= 8) v -= 18 * mg; // middlegame: discourage edge king
         const dir = p.color === 'w' ? -1 : 1;
         let shield = 0;
         for (let df = -1; df <= 1; df++) {
@@ -78,11 +120,43 @@ function evaluate(board) {
             if (sp && sp.type === 'P' && sp.color === p.color) shield++;
           }
         }
-        v += shield * 12;
+        v += shield * 12 * mg; // middlegame: pawn shield
+        v += centerness * 6 * egPhase; // endgame: centralize the king
       }
       score += p.color === 'w' ? v : -v;
     }
   }
+
+  // Endgame mating drive: the side that is ahead pushes the enemy king out of
+  // the center and brings its own king close to support the mate.
+  if (wK && bK && egPhase > 0) {
+    const wLead = wMat - bMat;
+    const kd = chebyshev(wK, bK);
+    const closeness = (14 - kd) * 4;
+    const bOff = Math.abs(bK[1] - fc) + Math.abs(bK[0] - rc);
+    const wOff = Math.abs(wK[1] - fc) + Math.abs(wK[0] - rc);
+    if (wLead > 100) score += egPhase * (closeness + bOff * 6);
+    else if (wLead < -100) score -= egPhase * (closeness + wOff * 6);
+  }
+
+  // Truth hunt: reward maneuvering the King toward enemy Truth pieces so it can
+  // capture them (only the King may take a Truth). Closer is better.
+  if (egPhase > 0) {
+    if (wK) for (const t of bT) {
+      const d = chebyshev(wK, t);
+      if (d < 10) score += egPhase * (10 - d) * 3;
+    }
+    if (bK) for (const t of wT) {
+      const d = chebyshev(bK, t);
+      if (d < 10) score -= egPhase * (10 - d) * 3;
+    }
+  }
+
+  // Contempt: the side with a lead is rewarded for keeping major pieces, so it
+  // retains the firepower to force checkmate rather than trading to a draw.
+  if (wMat - bMat > 100) score += wMaj * 6;
+  else if (bMat - wMat > 100) score -= bMaj * 6;
+
   return score;
 }
 
@@ -109,21 +183,32 @@ const TT = new Map();
 const FLAG = { EXACT: 0, LOWER: 1, UPPER: 2 };
 const now = () => performance.now();
 
-function quiesce(state, color, alpha, beta) {
+function quiesce(state, color, alpha, beta, qsPly = 0) {
+  const opp = color === 'w' ? 'b' : 'w';
   const checked = inCheck(state, color);
-  let moves = allLegalMoves(state, color);
-  if (moves.length === 0) return checked ? -MATE : 0;
+  const all = allLegalMoves(state, color);
+  if (all.length === 0) return checked ? -MATE : 0;
+  let moves;
   if (!checked) {
     const stand = evaluate(state.board) * (color === 'w' ? 1 : -1);
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
-    moves = moves.filter((m) => m.captured || m.promotion);
+    moves = all.filter((m) => m.captured || m.promotion);
+    // Include checking moves in the endgame so forcing mate sequences resolve.
+    if (qsPly < 2) {
+      for (const m of all) {
+        if (m.captured || m.promotion) continue;
+        if (inCheck(makeMove(state, m), opp)) moves.push(m);
+      }
+    }
     if (moves.length === 0) return alpha;
+  } else {
+    moves = all;
   }
   for (const m of orderMoves(moves)) {
     if (now() > deadline) { timedOut = true; break; }
     const ns = makeMove(state, m);
-    const sc = -quiesce(ns, color === 'w' ? 'b' : 'w', -beta, -alpha);
+    const sc = -quiesce(ns, opp, -beta, -alpha, qsPly + 1);
     if (sc >= beta) return beta;
     if (sc > alpha) alpha = sc;
   }
@@ -155,11 +240,16 @@ function negamax(state, color, depth, alpha, beta, ply) {
   let best = -Infinity;
   let bestMove = null;
   let flag = FLAG.UPPER;
+  const opp = color === 'w' ? 'b' : 'w';
   for (const m of ordered) {
     const ns = makeMove(state, m);
-    let sc = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha, ply + 1);
+    // Check extension: a checking move gets +1 ply so forcing mate sequences
+    // are found within the depth budget.
+    const givesCheck = inCheck(ns, opp);
+    const ext = givesCheck && ply < 40 ? 1 : 0;
+    let sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
     if (timedOut) break;
-    if (aggressive && inCheck(ns, color === 'w' ? 'b' : 'w')) sc += CHECK_BONUS;
+    if (aggressive && givesCheck) sc += CHECK_BONUS;
     if (sc > best) { best = sc; bestMove = m; }
     if (best > alpha) { alpha = best; flag = FLAG.EXACT; }
     if (alpha >= beta) { flag = FLAG.LOWER; break; }
@@ -193,10 +283,13 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false) {
     let alpha = -Infinity;
     let curBest = null;
     let curBestScore = -Infinity;
+    const opp = color === 'w' ? 'b' : 'w';
     for (const m of ordered) {
       const ns = makeMove(state, m);
-      let sc = -negamax(ns, color === 'w' ? 'b' : 'w', d - 1, -Infinity, -alpha, 1);
-      if (aggressive && inCheck(ns, color === 'w' ? 'b' : 'w')) sc += CHECK_BONUS;
+      const givesCheck = inCheck(ns, opp);
+      const ext = givesCheck ? 1 : 0;
+      let sc = -negamax(ns, opp, d - 1 + ext, -Infinity, -alpha, 1);
+      if (aggressive && givesCheck) sc += CHECK_BONUS;
       if (timedOut && d > 1) break;
       if (sc > curBestScore) { curBestScore = sc; curBest = m; }
       if (curBestScore > alpha) alpha = curBestScore;
