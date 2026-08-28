@@ -1,7 +1,7 @@
 // Enhanced Truth Chess AI — iterative-deepening negamax with alpha-beta,
 // a transposition table, quiescence search, MVV-LVA move ordering, and
 // difficulty levels 1-8. Plays strictly by Truth Chess rules via chessVariant.
-import { allLegalMoves, makeMove, inCheck } from './chessVariant';
+import { allLegalMoves, makeMove, inCheck, FILES, RANKS } from './chessVariant';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
@@ -26,8 +26,8 @@ const ZO = (() => {
   const t = {};
   for (const c of ['w', 'b']) {
     for (const ty of ['P', 'N', 'B', 'R', 'Q', 'K', 'T']) {
-      t[c + ty] = new Uint32Array(80);
-      for (let i = 0; i < 80; i++) t[c + ty][i] = r();
+      t[c + ty] = new Uint32Array(FILES * RANKS);
+      for (let i = 0; i < FILES * RANKS; i++) t[c + ty][i] = r();
     }
   }
   t.turn = r();
@@ -36,10 +36,10 @@ const ZO = (() => {
 
 function hashState(board, turn) {
   let h = 0;
-  for (let r = 0; r < 8; r++) {
-    for (let f = 0; f < 10; f++) {
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
-      if (p) h = (h ^ ZO[p.color + p.type][r * 10 + f]) >>> 0;
+      if (p) h = (h ^ ZO[p.color + p.type][r * FILES + f]) >>> 0;
     }
   }
   if (turn === 'b') h = (h ^ ZO.turn) >>> 0;
@@ -49,18 +49,21 @@ function hashState(board, turn) {
 // --- Evaluation -----------------------------------------------------------
 function evaluate(board) {
   let score = 0;
-  for (let r = 0; r < 8; r++) {
-    for (let f = 0; f < 10; f++) {
+  const fileCenter = (FILES - 1) / 2; // 4.5
+  const rankCenter = (RANKS - 1) / 2; // 4
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
       if (!p) continue;
       let v = VALUES[p.type];
-      const centerDist = Math.abs(f - 4.5) + Math.abs(r - 3.5);
+      const centerDist = Math.abs(f - fileCenter) + Math.abs(r - rankCenter);
       const centerness = 4.5 - centerDist;
       if (p.type === 'N' || p.type === 'B') v += centerness * 3;
       else if (p.type === 'P') v += centerness * 4;
       else if (p.type === 'T') v += centerness * 1.5;
       if (p.type === 'P') {
-        const adv = p.color === 'w' ? 6 - r : r - 1;
+        // White pawns start on row 7 (rank 2), promote at row 0; Black the mirror.
+        const adv = p.color === 'w' ? 7 - r : r - 1;
         v += adv * 4;
       }
       if (p.type === 'K') {
@@ -70,7 +73,7 @@ function evaluate(board) {
         for (let df = -1; df <= 1; df++) {
           const nf = f + df;
           const nr = r + dir;
-          if (nf >= 0 && nf < 10 && nr >= 0 && nr < 8) {
+          if (nf >= 0 && nf < FILES && nr >= 0 && nr < RANKS) {
             const sp = board[nr][nf];
             if (sp && sp.type === 'P' && sp.color === p.color) shield++;
           }

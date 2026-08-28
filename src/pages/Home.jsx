@@ -824,16 +824,18 @@ export default function Home() {
   }, [mode, gameOver, promo, localState, difficulty, turn, localMoves]);
 
   // computer vs computer: both sides auto-play at level 6, aggressively
-  // pursuing checkmate and never allowing threefold repetition.
+  // pursuing checkmate and never allowing threefold repetition. Move cadence
+  // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
     if (mode !== 'cvc' || gameOver || promo) return;
     setThinking(true);
+    const delay = [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const t = setTimeout(() => {
       let move = bestMove(localState, localState.turn, 6, true);
       if (move) move = pickNonRepeating(localState, move, localMoves);
       if (move) commitMove(move, 'Q');
       setThinking(false);
-    }, 2000);
+    }, delay);
     return () => {
       clearTimeout(t);
       setThinking(false);
@@ -956,7 +958,7 @@ export default function Home() {
             Truth Chess
           </h1>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
-            A 10×8 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
+            A 10×9 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
             flanking the Queen and King, with a pawn in front of every piece. Truth moves like a Queen,
             cannot capture any piece, and cannot be captured except by the opposing King — a passive blocker.
           </p>
@@ -1050,7 +1052,7 @@ export default function Home() {
                 )}
               </>
             ) : (
-              <div className="w-full max-w-[620px] aspect-[10/8] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
+              <div className="w-full max-w-[620px] aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
                 Create or join an online game to start playing
               </div>
             )}
@@ -1244,7 +1246,7 @@ export default function Home() {
                 <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
                 <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                   <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
-                  <li>• Standard chess rules apply on a 10-wide board, including castling and en passant.</li>
+                  <li>• Standard chess rules apply on a 10-wide, 9-rank board, including castling and en passant.</li>
                   <li>
                     • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
                     Queen but cannot capture any piece, and cannot be captured by any piece except the

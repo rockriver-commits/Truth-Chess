@@ -1,10 +1,10 @@
 // Standard Algebraic Notation for Truth Chess moves, plus helpers to build
 // a full SAN list from a stored move list, classify a move for sound, detect
 // threefold repetition, and export a PGN string.
-import { initialState, makeMove, gameStatus, allLegalMoves, positionKey } from './chessVariant';
+import { initialState, makeMove, gameStatus, allLegalMoves, positionKey, RANKS } from './chessVariant';
 
 export function squareName([r, f]) {
-  return String.fromCharCode(97 + f) + (8 - r);
+  return String.fromCharCode(97 + f) + (RANKS - r);
 }
 
 function sameSq(a, b) {
@@ -37,7 +37,7 @@ export function moveToSAN(state, move, promoType = 'Q') {
       const sameFile = others.some((m) => m.from[1] === move.from[1]);
       const sameRank = others.some((m) => m.from[0] === move.from[0]);
       if (!sameFile) san += String.fromCharCode(97 + move.from[1]);
-      else if (!sameRank) san += String(8 - move.from[0]);
+      else if (!sameRank) san += String(RANKS - move.from[0]);
       else san += squareName(move.from);
     }
   }

@@ -40,6 +40,7 @@ export default function ChessBoard({
   const theme = getBoardTheme(boardTheme);
   const gridRef = useRef(null);
   const [anim, setAnim] = useState(null);
+  const RANKS = 9;
 
   useEffect(() => {
     if (!animateMove) {
@@ -91,9 +92,9 @@ export default function ChessBoard({
     const rect = gridRef.current.getBoundingClientRect();
     if (rect.width) {
       const cellW = rect.width / 10;
-      const cellH = rect.height / 8;
+      const cellH = rect.height / RANKS;
       const col = (r, f) => (flipped ? 9 - f : f);
-      const row = (r, f) => (flipped ? 7 - r : r);
+      const row = (r, f) => (flipped ? (RANKS - 1) - r : r);
       const srcX = col(anim.from[0], anim.from[1]) * cellW;
       const srcY = row(anim.from[0], anim.from[1]) * cellH;
       const destX = col(anim.to[0], anim.to[1]) * cellW;
@@ -119,9 +120,9 @@ export default function ChessBoard({
           ref={gridRef}
           className="grid grid-cols-10 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10"
         >
-          {Array.from({ length: 8 }).map((_, di) =>
+          {Array.from({ length: RANKS }).map((_, di) =>
             Array.from({ length: 10 }).map((_, dj) => {
-              const r = flipped ? 7 - di : di;
+              const r = flipped ? (RANKS - 1) - di : di;
               const f = flipped ? 9 - dj : dj;
               const dark = (r + f) % 2 === 1;
               const key = `${r},${f}`;
@@ -160,7 +161,7 @@ export default function ChessBoard({
                       className="absolute top-0.5 left-1 text-[0.55rem] font-semibold"
                       style={{ color: dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.45)' }}
                     >
-                      {8 - r}
+                      {RANKS - r}
                     </span>
                   )}
                   {isHint && (

@@ -1,10 +1,12 @@
-// Truth Chess — a 10x8 chess variant.
+// Truth Chess — a 10x9 chess variant.
 // Back rank: R N B T Q K T B N R. Truth (T) moves like a Queen but never captures
 // and cannot be captured by any piece EXCEPT the opposing King.
 // Castling and en passant are supported. State carries castling rights + ep target.
+// White occupies ranks 1-2 (rows 8-7), Black occupies ranks 8-9 (rows 1-0);
+// ranks 3-7 (rows 6-2) are an empty buffer — armies start five ranks apart.
 
 export const FILES = 10;
-export const RANKS = 8;
+export const RANKS = 9;
 
 const BACK = ['R', 'N', 'B', 'T', 'Q', 'K', 'T', 'B', 'N', 'R'];
 
@@ -13,8 +15,8 @@ export function initialBoard() {
   for (let f = 0; f < FILES; f++) {
     board[0][f] = { type: BACK[f], color: 'b' };
     board[1][f] = { type: 'P', color: 'b' };
-    board[6][f] = { type: 'P', color: 'w' };
-    board[7][f] = { type: BACK[f], color: 'w' };
+    board[7][f] = { type: 'P', color: 'w' };
+    board[8][f] = { type: BACK[f], color: 'w' };
   }
   return board;
 }
@@ -69,8 +71,8 @@ const KING_OFFSETS = [
 // Castling definitions for the 10-wide board. King starts on file 5.
 const CASTLE = {
   w: {
-    K: { kingFrom: [7, 5], kingTo: [7, 7], rookFrom: [7, 9], rookTo: [7, 6], empty: [[7, 6], [7, 7], [7, 8]], pass: [[7, 5], [7, 6], [7, 7]] },
-    Q: { kingFrom: [7, 5], kingTo: [7, 3], rookFrom: [7, 0], rookTo: [7, 4], empty: [[7, 1], [7, 2], [7, 3], [7, 4]], pass: [[7, 5], [7, 4], [7, 3]] },
+    K: { kingFrom: [8, 5], kingTo: [8, 7], rookFrom: [8, 9], rookTo: [8, 6], empty: [[8, 6], [8, 7], [8, 8]], pass: [[8, 5], [8, 6], [8, 7]] },
+    Q: { kingFrom: [8, 5], kingTo: [8, 3], rookFrom: [8, 0], rookTo: [8, 4], empty: [[8, 1], [8, 2], [8, 3], [8, 4]], pass: [[8, 5], [8, 4], [8, 3]] },
   },
   b: {
     K: { kingFrom: [0, 5], kingTo: [0, 7], rookFrom: [0, 9], rookTo: [0, 6], empty: [[0, 6], [0, 7], [0, 8]], pass: [[0, 5], [0, 6], [0, 7]] },
@@ -134,8 +136,8 @@ function pieceMoves(state, r, f) {
   switch (type) {
     case 'P': {
       const dir = color === 'w' ? -1 : 1;
-      const startRank = color === 'w' ? 6 : 1;
-      const promoRank = color === 'w' ? 0 : 7;
+      const startRank = color === 'w' ? 7 : 1;
+      const promoRank = color === 'w' ? 0 : 8;
       const tr = r + dir;
       if (inBounds(tr, f) && !board[tr][f]) {
         if (tr === promoRank) add(tr, f, { promotion: true });
