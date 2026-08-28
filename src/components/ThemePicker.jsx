@@ -19,7 +19,7 @@ export default function ThemePicker({ boardTheme, pieceStyle, onBoardTheme, onPi
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[0.65rem] uppercase tracking-widest text-stone-400 mb-1.5">Board theme</p>
+        <p className="text-[0.65rem] uppercase tracking-widest text-stone-400 mb-1.5">Board color</p>
         <div className="grid grid-cols-4 gap-1.5">
           {BOARD_THEME_KEYS.map((key) => {
             const t = BOARD_THEMES[key];

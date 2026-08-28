@@ -1,7 +1,8 @@
 // Truth Chess — a 10x9 chess variant.
-// Back rank: R N B T Q K T B N R. Truth (T) moves like a Queen but never captures
-// and cannot be captured by any piece EXCEPT the opposing King. Although it cannot
-// capture, it controls the squares it slides to, so it can deliver check & checkmate.
+// Back rank: R N B T Q K T B N R. Truth (T) moves like a Queen. It captures only the
+// opposing Truth, and can be captured only by the opposing King or an opposing Truth.
+// Although it otherwise does not capture, it controls the squares it slides to, so it
+// can deliver check & checkmate.
 // Castling and en passant are supported. State carries castling rights + ep target.
 // White occupies ranks 1-2 (rows 8-7), Black occupies ranks 8-9 (rows 1-0);
 // ranks 3-7 (rows 6-2) are an empty buffer — armies start five ranks apart.
@@ -100,7 +101,7 @@ function pieceMoves(state, r, f) {
       while (inBounds(tr, tf)) {
         const t = board[tr][tf];
         if (!t) add(tr, tf);
-        else if (t.color === color || t.type === 'T') break; // Truth is never capturable by sliders
+        else if (t.color === color || t.type === 'T') break; // Truth is capturable only by a King or an opposing Truth, never by B/R/Q
         else {
           add(tr, tf, { captured: t });
           break;
@@ -178,6 +179,7 @@ function pieceMoves(state, r, f) {
       slide(BISHOP_DIRS);
       break;
     case 'T': {
+      const enemy = color === 'w' ? 'b' : 'w';
       for (const dirs of [ROOK_DIRS, BISHOP_DIRS]) {
         for (const [dr, df] of dirs) {
           let tr = r + dr;
@@ -185,7 +187,11 @@ function pieceMoves(state, r, f) {
           while (inBounds(tr, tf)) {
             const t = board[tr][tf];
             if (!t) add(tr, tf);
-            else break; // Truth never captures
+            else {
+              // Truth captures only the opposing Truth; every other piece blocks it.
+              if (t.color === enemy && t.type === 'T') add(tr, tf, { captured: t });
+              break;
+            }
             tr += dr;
             tf += df;
           }

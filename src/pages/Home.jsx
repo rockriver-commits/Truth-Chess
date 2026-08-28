@@ -64,6 +64,7 @@ export default function Home() {
   // localMoves.length, so it stays aligned with actual play.
   const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
   const recordedRef = useRef(false);
+  const kingOnlySinceRef = useRef(null);
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -392,6 +393,7 @@ export default function Home() {
     setElapsed(0);
     openingRef.current = { book: null, wTarget: null, bTarget: null };
     recordedRef.current = false;
+    kingOnlySinceRef.current = null;
   }
 
   function changeMode(m) {
@@ -854,8 +856,24 @@ export default function Home() {
         bTarget: rollOpeningTarget('b', localState.board),
       };
     }
+    // King vs King visual: if only the two kings remain, after 4 plies speed up
+    // the move cadence so the endgame looks lively on screen.
+    let onlyKings = true;
+    for (let r = 0; r < 9 && onlyKings; r++) {
+      for (let f = 0; f < 10; f++) {
+        const p = localState.board[r][f];
+        if (p && p.type !== 'K') { onlyKings = false; break; }
+      }
+    }
+    if (onlyKings) {
+      if (kingOnlySinceRef.current == null) kingOnlySinceRef.current = localMoves.length;
+    } else {
+      kingOnlySinceRef.current = null;
+    }
+    const fastKings = onlyKings && localMoves.length - kingOnlySinceRef.current >= 4;
     setThinking(true);
-    const delay = mode === 'cvc_turbo' ? 500 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
+    const baseDelay = mode === 'cvc_turbo' ? 500 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
+    const delay = fastKings ? 120 : baseDelay;
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, localState.turn);
       const sideTarget = localState.turn === 'w' ? openingRef.current.wTarget : openingRef.current.bTarget;
@@ -999,7 +1017,7 @@ export default function Home() {
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
             A 10×9 board with a new piece — <span className="font-medium text-stone-700">Truth</span> —
             flanking the Queen and King, with a pawn in front of every piece. Truth moves like a Queen,
-            cannot capture any piece, and cannot be captured except by the opposing King — a passive blocker.
+            captures only the opposing Truth, and is captured only by the opposing King or an opposing Truth.
           </p>
         </header>
 
@@ -1108,6 +1126,14 @@ export default function Home() {
                     {soundOn ? 'Sound On' : 'Sound Off'}
                   </Button>
                 </div>
+                <div className="w-full max-w-[620px] mx-auto mt-2">
+                  <ThemePicker
+                    boardTheme={boardTheme}
+                    pieceStyle={pieceStyle}
+                    onBoardTheme={setBoardTheme}
+                    onPieceStyle={setPieceStyle}
+                  />
+                </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
                 {moveSanDisplay.length > 0 && (
@@ -1199,14 +1225,6 @@ export default function Home() {
                   </Button>
                 )}
               </div>
-              <div className="pt-1 border-t border-stone-100">
-                <ThemePicker
-                  boardTheme={boardTheme}
-                  pieceStyle={pieceStyle}
-                  onBoardTheme={setBoardTheme}
-                  onPieceStyle={setPieceStyle}
-                />
-              </div>
             </div>
 
             {(showDifficulty || mode === 'computer') && (
@@ -1285,9 +1303,9 @@ export default function Home() {
                   <li>• Standard chess rules apply on a 10-wide, 9-rank board, including castling and en passant.</li>
                   <li>
                     • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
-                    Queen but cannot capture any piece, and cannot be captured by any piece except the
-                    opposing King — it acts as a passive blocker. Although it cannot capture, it controls the
-                    squares it slides to, so it can deliver check and checkmate.
+                    Queen. It captures only the opposing Truth, and can be captured only by the opposing King
+                    or an opposing Truth — otherwise it acts as a passive blocker. It controls the squares it
+                    slides to, so it can deliver check and checkmate.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
                   <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>

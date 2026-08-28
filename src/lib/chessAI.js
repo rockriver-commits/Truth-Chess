@@ -7,6 +7,16 @@ import { consultMateBook, loadAggression, OPENING_PLIES } from './aiLearning';
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
 
+// Move offsets for the attack map (kept local so we don't import engine internals).
+const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const BISHOP_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+const KNIGHT_OFFSETS = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
+const KING_OFFSETS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+// Reused attack-map buffers: for each square, the minimum attacker value per color
+// (a value of 1 represents the king). Truth is excluded — it never threatens N/B/R/Q.
+const _wAtk = new Int16Array(FILES * RANKS);
+const _bAtk = new Int16Array(FILES * RANKS);
+
 // Difficulty presets. depth = max search depth, randomness = chance to play a
 // random legal move (weakens low levels), quiescence = capture-extension on,
 // timeMs = soft budget for iterative deepening (caps thinking time on mobile).
@@ -65,6 +75,48 @@ function chebyshev(a, b) {
   return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
 }
 
+// Build per-color attack maps: for each square, the minimum value of an enemy
+// piece attacking it (1 = the king). Used by the hanging-piece safety term.
+function buildAttackMap(board) {
+  _wAtk.fill(0);
+  _bAtk.fill(0);
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = board[r][f];
+      if (!p || p.type === 'T') continue;
+      const atk = p.color === 'w' ? _wAtk : _bAtk;
+      const val = p.type === 'K' ? 1 : VALUES[p.type];
+      const mark = (ar, af) => {
+        const j = ar * FILES + af;
+        if (atk[j] === 0 || val < atk[j]) atk[j] = val;
+      };
+      if (p.type === 'P') {
+        const dir = p.color === 'w' ? -1 : 1;
+        for (const df of [-1, 1]) {
+          const ar = r + dir, af = f + df;
+          if (ar >= 0 && ar < RANKS && af >= 0 && af < FILES) mark(ar, af);
+        }
+      } else if (p.type === 'N' || p.type === 'K') {
+        const offs = p.type === 'N' ? KNIGHT_OFFSETS : KING_OFFSETS;
+        for (const [dr, df] of offs) {
+          const ar = r + dr, af = f + df;
+          if (ar >= 0 && ar < RANKS && af >= 0 && af < FILES) mark(ar, af);
+        }
+      } else {
+        const dirs = p.type === 'B' ? BISHOP_DIRS : p.type === 'R' ? ROOK_DIRS : ROOK_DIRS.concat(BISHOP_DIRS);
+        for (const [dr, df] of dirs) {
+          let ar = r + dr, af = f + df;
+          while (ar >= 0 && ar < RANKS && af >= 0 && af < FILES) {
+            mark(ar, af);
+            if (board[ar][af]) break;
+            ar += dr; af += df;
+          }
+        }
+      }
+    }
+  }
+}
+
 function evaluate(board) {
   let score = 0;
   const fc = (FILES - 1) / 2; // 4.5
@@ -110,6 +162,27 @@ function evaluate(board) {
         // White pawns start on row 7 (rank 2), promote at row 0; Black the mirror.
         const adv = p.color === 'w' ? 7 - r : r - 1;
         v += adv * 4;
+        // Passed / free-runner pawns. A pawn with a clear file to promotion is a
+        // strong "free exchange" candidate — reward it, especially in the endgame.
+        const dir = p.color === 'w' ? -1 : 1;
+        let clear = true;
+        for (let rr = r + dir; rr >= 0 && rr < RANKS; rr += dir) {
+          if (board[rr][f]) { clear = false; break; }
+        }
+        if (clear) {
+          v += (adv + 1) * (2 + 8 * egPhase);
+        } else {
+          let passed = true;
+          for (let df = -1; df <= 1 && passed; df++) {
+            const nf = f + df;
+            if (nf < 0 || nf >= FILES) continue;
+            for (let ar = r + dir; ar >= 0 && ar < RANKS; ar += dir) {
+              const op = board[ar][nf];
+              if (op && op.type === 'P' && op.color !== p.color) { passed = false; break; }
+            }
+          }
+          if (passed) v += (adv + 1) * (1 + 4 * egPhase);
+        }
       }
       if (p.type === 'K') {
         if (f <= 1 || f >= 8) v -= 18 * mg; // middlegame: discourage edge king
@@ -163,6 +236,41 @@ function evaluate(board) {
   const contempt = 6 * curAggressionMul;
   if (wMat - bMat > 100) score += wMaj * contempt;
   else if (bMat - wMat > 100) score -= bMaj * contempt;
+
+  // Hanging valuable pieces (N/B/R/Q): one attacked by a lesser enemy piece, or
+  // attacked by the enemy king with no defender, is "given up for free". Penalize,
+  // relaxed when the owner is ~4 pieces up (sacrifices to force mate are fine).
+  // Evaluated only for non-quiescence levels — quiescence already resolves these
+  // captures at higher levels, so this keeps low levels safe without slowing them.
+  if (!useQuiescence) {
+    buildAttackMap(board);
+    const RELAX = 1300;
+    for (let r = 0; r < RANKS; r++) {
+      for (let f = 0; f < FILES; f++) {
+        const p = board[r][f];
+        if (!p || (p.type !== 'N' && p.type !== 'B' && p.type !== 'R' && p.type !== 'Q')) continue;
+        const pv = VALUES[p.type];
+        const i = r * FILES + f;
+        if (p.color === 'w') {
+          if (wMat - bMat >= RELAX) continue;
+          const ev = _bAtk[i];
+          if (ev > 0 && ev < pv) {
+            const def = _wAtk[i];
+            const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
+            if (unsafe) score -= (pv - ev) * 0.4;
+          }
+        } else {
+          if (bMat - wMat >= RELAX) continue;
+          const ev = _wAtk[i];
+          if (ev > 0 && ev < pv) {
+            const def = _bAtk[i];
+            const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
+            if (unsafe) score += (pv - ev) * 0.4;
+          }
+        }
+      }
+    }
+  }
 
   // --- Truth blockade -----------------------------------------------------
   // Truth pieces are passive blockers (uncapturable except by the enemy King),
