@@ -3,9 +3,11 @@ import ChessBoard from '@/components/ChessBoard';
 import {
   initialState,
   legalMovesFor,
+  allLegalMoves,
   gameStatus,
   makeMove,
   findKing,
+  positionKey,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
@@ -805,7 +807,27 @@ export default function Home() {
     if (mode !== 'cvc' || gameOver || promo) return;
     setThinking(true);
     const t = setTimeout(() => {
-      const move = bestMove(localState, localState.turn, 6);
+      let move = bestMove(localState, localState.turn, 6);
+      // Disallow threefold repetition: if the chosen move would repeat a
+      // position for the 3rd time, fall back to the first legal move that
+      // doesn't (so the exhibition game keeps progressing).
+      if (move) {
+        const historyKeys = [positionKey(initialState())];
+        let st = initialState();
+        for (const m of localMoves) {
+          st = makeMove(st, m, m.promoType || 'Q');
+          historyKeys.push(positionKey(st));
+        }
+        const occOf = (k) => historyKeys.reduce((n, hk) => (hk === k ? n + 1 : n), 0);
+        const chosenKey = positionKey(makeMove(localState, move, 'Q'));
+        if (occOf(chosenKey) >= 2) {
+          const safe = allLegalMoves(localState, localState.turn).find((am) => {
+            const ak = positionKey(makeMove(localState, am, am.promotion ? 'Q' : 'Q'));
+            return occOf(ak) < 2;
+          });
+          if (safe) move = safe;
+        }
+      }
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 2000);
@@ -814,7 +836,7 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, turn]);
+  }, [mode, gameOver, promo, localState, turn, localMoves]);
 
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
