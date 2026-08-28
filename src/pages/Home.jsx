@@ -904,71 +904,37 @@ export default function Home() {
   }
 
   let statusText;
-  if (mode === 'online') {
-    if (!onlineGame) statusText = 'Create or join a game';
-    else if (onlineGame.status === 'waiting') statusText = 'Waiting for opponent…';
-    else if (onlineGame.status === 'active') {
-      if (spectator) {
-        statusText = gameOver
-          ? (status === 'checkmate'
-            ? `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`
-            : status === 'fifty_move'
-            ? 'Draw — 50-move rule'
-            : threefold
-            ? 'Draw — threefold repetition'
-            : 'Stalemate — draw')
-          : `Spectating — ${turn === 'w' ? 'White' : 'Black'} to move`;
-      } else if (submitting) statusText = 'Sending move…';
-      else if (gameOver)
-        statusText =
-          status === 'checkmate'
-            ? `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`
-            : status === 'fifty_move'
-            ? 'Draw — 50-move rule'
-            : threefold
-            ? 'Draw — threefold repetition'
-            : 'Stalemate — draw';
-      else if (myColor && turn === myColor) statusText = 'Your move';
-      else if (ghostOpponent && thinking) statusText = 'Ghost is thinking…';
-      else statusText = `Waiting for ${turn === 'w' ? 'White' : 'Black'}…`;
+  if (mode === 'online' && onlineGame) {
+    if (onlineGame.status === 'waiting') {
+      statusText = 'Waiting for opponent…';
     } else if (onlineGame.status === 'finished') {
-      if (spectator) {
-        statusText =
-          onlineGame.result === 'draw'
-            ? 'Spectating — Draw'
-            : `Spectating — ${onlineGame.result === 'white_wins' ? 'White' : 'Black'} won`;
-      } else {
-        const won =
-          (onlineGame.result === 'white_wins' && myColor === 'w') ||
-          (onlineGame.result === 'black_wins' && myColor === 'b');
-        statusText =
-          onlineGame.result === 'draw' ? 'Draw' : won ? 'You won!' : 'You lost';
-      }
+      statusText =
+        onlineGame.result === 'draw'
+          ? 'Draw'
+          : onlineGame.result === 'white_wins'
+          ? 'White wins'
+          : onlineGame.result === 'black_wins'
+          ? 'Black wins'
+          : `${turn === 'w' ? 'White' : 'Black'}'s move`;
     } else {
-      statusText = 'Loading…';
+      statusText = `${turn === 'w' ? 'White' : 'Black'}'s move`;
     }
-  } else {
+  } else if (gameOver) {
     if (timedOut) statusText = `${timedOut === 'w' ? 'White' : 'Black'} loses on time`;
     else if (drawAgreed) statusText = 'Draw by agreement';
-    else if (resigned) {
+    else if (resigned)
       statusText =
         mode === 'computer'
           ? 'You resigned — Computer wins'
           : `${turn === 'w' ? 'Black' : 'White'} wins by resignation`;
-    } else if (state) {
-      statusText = {
-        playing: `${turn === 'w' ? 'White' : 'Black'} to move`,
-        check: `${turn === 'w' ? 'White' : 'Black'} is in check`,
-        checkmate: `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`,
-        stalemate: 'Stalemate — draw',
-        fifty_move: 'Draw — 50-move rule',
-      }[status] || 'Loading…';
-      if (threefold && !gameOver) statusText = `${statusText} (threefold)`;
-      if (threefold && gameOver) statusText = 'Draw — threefold repetition';
-      if (thinking) statusText = 'Computer is thinking…';
-    } else {
-      statusText = 'Loading…';
-    }
+    else if (status === 'checkmate')
+      statusText = `Checkmate — ${turn === 'w' ? 'Black' : 'White'} wins`;
+    else if (status === 'stalemate') statusText = 'Stalemate — draw';
+    else if (status === 'fifty_move') statusText = 'Draw — 50-move rule';
+    else if (threefold) statusText = 'Draw — threefold repetition';
+    else statusText = `${turn === 'w' ? 'White' : 'Black'}'s move`;
+  } else {
+    statusText = `${turn === 'w' ? 'White' : 'Black'}'s move`;
   }
 
   const showDifficulty = mode === 'computer' || (mode === 'online' && ghostOpponent);
@@ -1067,6 +1033,22 @@ export default function Home() {
                   />
                 </div>
                 <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
+                <div className="w-full max-w-[620px] mx-auto mt-1 flex items-center justify-between gap-3">
+                  <p
+                    className={`text-base font-medium ${
+                      status === 'checkmate' ? 'text-rose-600' : 'text-stone-800'
+                    }`}
+                  >
+                    {statusText}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant={soundOn ? 'default' : 'outline'}
+                    onClick={() => setSoundOn((s) => !s)}
+                  >
+                    {soundOn ? 'Sound On' : 'Sound Off'}
+                  </Button>
+                </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
                 {gameOver && positionList.length > 1 && (
@@ -1130,13 +1112,6 @@ export default function Home() {
                 <Button size="sm" variant="outline" onClick={() => setFlipped((f) => !f)}>
                   Flip board
                 </Button>
-                <Button
-                  size="sm"
-                  variant={soundOn ? 'default' : 'outline'}
-                  onClick={() => setSoundOn((s) => !s)}
-                >
-                  {soundOn ? 'Sound On' : 'Sound Off'}
-                </Button>
                 {mode === 'local' && (
                   <Button
                     size="sm"
@@ -1177,70 +1152,48 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
-              {showDifficulty && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
-                    <span className="text-xs font-semibold text-stone-700">
-                      Level {difficulty}/{isPro ? 8 : 3}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={isPro ? 8 : 3}
-                    step={1}
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(Number(e.target.value))}
-                    className="w-full accent-amber-600"
-                  />
-                  {!isPro && canUpgrade && (
-                    <button
-                      type="button"
-                      onClick={() => setShowPro(true)}
-                      className="mt-1 text-[0.7rem] text-amber-600 hover:underline"
-                    >
-                      🔒 Levels 4–8 are Pro — upgrade
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {mode !== 'online' && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`inline-block w-3 h-3 rounded-full ${
-                        turn === 'w' ? 'bg-stone-100 ring-1 ring-stone-400' : 'bg-stone-800'
-                      }`}
-                    />
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-stone-400">Status</p>
-                      <p
-                        className={`text-lg font-medium ${
-                          status === 'check' || status === 'checkmate'
-                            ? 'text-rose-600'
-                            : 'text-stone-800'
-                        }`}
-                      >
-                        {statusText}
-                      </p>
+            {(showDifficulty || mode === 'computer') && (
+              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
+                {showDifficulty && (
+                  <div className={mode === 'computer' ? 'mb-4' : ''}>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
+                      <span className="text-xs font-semibold text-stone-700">
+                        Level {difficulty}/{isPro ? 8 : 3}
+                      </span>
                     </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={isPro ? 8 : 3}
+                      step={1}
+                      value={difficulty}
+                      onChange={(e) => setDifficulty(Number(e.target.value))}
+                      className="w-full accent-amber-600"
+                    />
+                    {!isPro && canUpgrade && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPro(true)}
+                        className="mt-1 text-[0.7rem] text-amber-600 hover:underline"
+                      >
+                        🔒 Levels 4–8 are Pro — upgrade
+                      </button>
+                    )}
                   </div>
-                  {mode === 'computer' && (
-                    <Button
-                      onClick={undo}
-                      variant="outline"
-                      className="mt-4 w-full"
-                      disabled={thinking || history.length < 2 || gameOver || promo}
-                    >
-                      Undo
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+                {mode === 'computer' && (
+                  <Button
+                    onClick={undo}
+                    variant="outline"
+                    className="w-full"
+                    disabled={thinking || history.length < 2 || gameOver || promo}
+                  >
+                    Undo
+                  </Button>
+                )}
+              </div>
+            )}
 
             {mode === 'online' && (
               <OnlinePanel
