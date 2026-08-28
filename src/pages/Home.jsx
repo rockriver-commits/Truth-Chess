@@ -55,9 +55,10 @@ export default function Home() {
   const [thinking, setThinking] = useState(false);
   const [history, setHistory] = useState([]);
   const [pendingAdvance, setPendingAdvance] = useState(false);
-  // AI-vs-AI opening book: a randomly chosen traditional opening for the current
-  // exhibition, plus how many of its scripted plies have been played.
-  const openingRef = useRef({ book: null, idx: 0 });
+  // Opening book shared by AI-vs-AI and vs-Computer: a randomly chosen
+  // traditional opening for the current game. The index into the book is just
+  // localMoves.length, so it stays aligned with actual play.
+  const openingRef = useRef({ book: null });
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -398,6 +399,7 @@ export default function Home() {
     setBlackClock(tc.initial);
     setStartMs(Date.now());
     setElapsed(0);
+    openingRef.current = { book: null };
   }
 
   function changeMode(m) {
@@ -810,13 +812,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whiteClock, blackClock, mode, gameOver, timeControl]);
 
-  // computer AI
+  // computer AI: opens with a randomly chosen traditional opening (one of
+  // twenty-three) for as long as the human's moves keep the book on track, then
+  // plays the search engine. Never allows threefold repetition.
   useEffect(() => {
     if (mode !== 'computer' || turn !== 'b' || gameOver || promo) return;
+    if (!openingRef.current.book) openingRef.current = { book: randomOpening() };
     setThinking(true);
     const t = setTimeout(() => {
-      let move = bestMove(localState, 'b', difficulty);
-      if (move) move = pickNonRepeating(localState, move, localMoves);
+      const legal = allLegalMoves(localState, 'b');
+      const scripted = bookMove(openingRef.current.book, localMoves.length, legal, 'b');
+      let move;
+      if (scripted) move = scripted;
+      else {
+        move = bestMove(localState, 'b', difficulty);
+        if (move) move = pickNonRepeating(localState, move, localMoves);
+      }
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 350);
@@ -828,22 +839,21 @@ export default function Home() {
   }, [mode, gameOver, promo, localState, difficulty, turn, localMoves]);
 
   // computer vs computer: each side opens with a randomly chosen traditional
-  // opening (one of seven), then auto-plays at level 6 — aggressively pursuing
-  // checkmate and never allowing threefold repetition. Move cadence varies
-  // slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
+  // opening (one of twenty-three), then auto-plays at level 6 — aggressively
+  // pursuing checkmate and never allowing threefold repetition. Move cadence
+  // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
     if (mode !== 'cvc' || gameOver || promo) return;
     // A fresh game (no moves yet) picks a new opening for this exhibition.
-    if (localMoves.length === 0) openingRef.current = { book: randomOpening(), idx: 0 };
+    if (localMoves.length === 0) openingRef.current = { book: randomOpening() };
     setThinking(true);
     const delay = [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, localState.turn);
-      const scripted = bookMove(openingRef.current.book, openingRef.current.idx, legal, localState.turn);
+      const scripted = bookMove(openingRef.current.book, localMoves.length, legal, localState.turn);
       let move;
       if (scripted) {
         move = scripted;
-        openingRef.current.idx += 1;
       } else {
         move = bestMove(localState, localState.turn, 6, true);
         if (move) move = pickNonRepeating(localState, move, localMoves);
@@ -981,7 +991,7 @@ export default function Home() {
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
-            <div className="w-full max-w-[620px] mb-3">
+            <div className="w-full max-w-[620px] mb-3 space-y-2">
               <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 rounded-xl">
                 <button
                   type="button"
@@ -1020,6 +1030,13 @@ export default function Home() {
                   AI vs AI
                 </button>
               </div>
+              {mode !== 'online' && (
+                <div className="flex justify-end">
+                  <Button onClick={resetLocal} variant="outline" size="sm">
+                    Reset Game
+                  </Button>
+                </div>
+              )}
             </div>
             {state ? (
               <>
@@ -1209,22 +1226,14 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                  {mode === 'computer' ? (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <Button
-                        onClick={undo}
-                        variant="outline"
-                        disabled={thinking || history.length < 2 || gameOver || promo}
-                      >
-                        Undo
-                      </Button>
-                      <Button onClick={resetLocal} variant="outline">
-                        New Game
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button onClick={resetLocal} variant="outline" className="mt-4 w-full">
-                      New Game
+                  {mode === 'computer' && (
+                    <Button
+                      onClick={undo}
+                      variant="outline"
+                      className="mt-4 w-full"
+                      disabled={thinking || history.length < 2 || gameOver || promo}
+                    >
+                      Undo
                     </Button>
                   )}
                 </>
