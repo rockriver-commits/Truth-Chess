@@ -12,13 +12,13 @@ function Cross({ color }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="w-full h-full"
+      className="w-[60%] h-[60%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
       <polygon points="5,23 19,23 12,15" fill={fill} stroke={stroke} strokeWidth="0.6" strokeLinejoin="round" />
       <rect x="10" y="0" width="4" height="23" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
       <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
-      <circle cx="12" cy="8.5" r="1.4" fill="#facc15" stroke={stroke} strokeWidth="0.3" />
+      <circle cx="12" cy="8.5" r="2.6" fill="#facc15" stroke={stroke} strokeWidth="0.3" />
     </svg>
   );
 }
@@ -55,19 +55,7 @@ export default function ChessBoard({
 
   const renderPiece = (piece) => {
     if (!piece) return null;
-    if (piece.type === 'T') {
-      // Size the cross in an em-box matching the Queen figurine's font size so
-      // the two pieces render at the same height.
-      const fs = pieceStyle === 'letter' ? 'min(6vw, 1.6rem)' : 'min(7.8vw, 2.5rem)';
-      return (
-        <span
-          className="relative leading-none inline-flex items-center justify-center"
-          style={{ fontSize: fs, width: '1em', height: '1em' }}
-        >
-          <Cross color={piece.color} />
-        </span>
-      );
-    }
+    if (piece.type === 'T') return <Cross color={piece.color} />;
     return (
       <span
         className="relative leading-none"
