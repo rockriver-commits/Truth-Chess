@@ -11,6 +11,7 @@ import {
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
+import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
 import { base44 } from '@/api/base44Client';
@@ -54,6 +55,9 @@ export default function Home() {
   const [thinking, setThinking] = useState(false);
   const [history, setHistory] = useState([]);
   const [pendingAdvance, setPendingAdvance] = useState(false);
+  // AI-vs-AI opening book: a randomly chosen traditional opening for the current
+  // exhibition, plus how many of its scripted plies have been played.
+  const openingRef = useRef({ book: null, idx: 0 });
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -823,16 +827,27 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, gameOver, promo, localState, difficulty, turn, localMoves]);
 
-  // computer vs computer: both sides auto-play at level 6, aggressively
-  // pursuing checkmate and never allowing threefold repetition. Move cadence
-  // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
+  // computer vs computer: each side opens with a randomly chosen traditional
+  // opening (one of seven), then auto-plays at level 6 — aggressively pursuing
+  // checkmate and never allowing threefold repetition. Move cadence varies
+  // slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
     if (mode !== 'cvc' || gameOver || promo) return;
+    // A fresh game (no moves yet) picks a new opening for this exhibition.
+    if (localMoves.length === 0) openingRef.current = { book: randomOpening(), idx: 0 };
     setThinking(true);
     const delay = [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const t = setTimeout(() => {
-      let move = bestMove(localState, localState.turn, 6, true);
-      if (move) move = pickNonRepeating(localState, move, localMoves);
+      const legal = allLegalMoves(localState, localState.turn);
+      const scripted = bookMove(openingRef.current.book, openingRef.current.idx, legal, localState.turn);
+      let move;
+      if (scripted) {
+        move = scripted;
+        openingRef.current.idx += 1;
+      } else {
+        move = bestMove(localState, localState.turn, 6, true);
+        if (move) move = pickNonRepeating(localState, move, localMoves);
+      }
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, delay);
