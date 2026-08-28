@@ -1025,7 +1025,7 @@ export default function Home() {
               </svg>
             </span>
             , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
-            truth pieces and put the king in Check.
+            truth pieces and can put the king in Check. Conversely, the King can take the Truth.
           </p>
         </header>
 
