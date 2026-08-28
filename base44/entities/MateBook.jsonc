@@ -1,0 +1,32 @@
+{
+  "name": "MateBook",
+  "type": "object",
+  "properties": {
+    "position_key": {
+      "type": "string",
+      "description": "Stable position key (board + turn + castling + en-passant)."
+    },
+    "from": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "to": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "mateIn": {
+      "type": "number",
+      "description": "Winner moves remaining to mate from this position."
+    }
+  },
+  "required": [
+    "position_key",
+    "from",
+    "to",
+    "mateIn"
+  ]
+}

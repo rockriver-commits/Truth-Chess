@@ -10,7 +10,7 @@ import {
   positionKey,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
-import { rollOpeningTarget, recordMate, updateAggression } from '@/lib/aiLearning';
+import { rollOpeningTarget, recordMate, updateAggression, syncMateBookFromServer } from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
@@ -107,6 +107,12 @@ export default function Home() {
 
   useEffect(() => {
     base44.auth.me().then(setMe).catch(() => setMe(null));
+  }, []);
+
+  // Load the shared, server-backed mate book so the AI recalls checkmates
+  // learned in any mode, any session, on any device.
+  useEffect(() => {
+    syncMateBookFromServer();
   }, []);
 
   const isPro = me?.plan === 'pro';
@@ -928,26 +934,26 @@ export default function Home() {
     }
   }, [status, turn, mode, difficulty]);
 
-  // Self-play learning (AI vs AI only): when a game ends, record the mating
-  // line into the mate book and tune aggression from how fast it ended.
+  // Checkmate learning (all modes): whenever a game ends in checkmate, record
+  // the winning line into the shared, server-backed mate book so the AI can
+  // recall it later — in any mode, session, or device. Adaptive aggression
+  // tuning stays a self-play (AI vs AI) signal only.
   useEffect(() => {
-    if (mode !== 'cvc' && mode !== 'cvc_turbo') {
-      recordedRef.current = false;
-      return;
-    }
     if (!gameOver) {
       recordedRef.current = false;
       return;
     }
     if (recordedRef.current) return;
-    recordedRef.current = true;
+    const isCvc = mode === 'cvc' || mode === 'cvc_turbo';
     if (status === 'checkmate') {
+      recordedRef.current = true;
       recordMate(positionList);
-      updateAggression(localMoves.length);
-    } else {
+      if (isCvc) updateAggression(localMoves.length);
+    } else if (isCvc && (status === 'stalemate' || status === 'fifty_move' || threefold)) {
+      recordedRef.current = true;
       updateAggression(null);
     }
-  }, [mode, gameOver, status, positionList, localMoves.length]);
+  }, [mode, gameOver, status, threefold, positionList, localMoves.length]);
 
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));

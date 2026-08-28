@@ -8,6 +8,7 @@
 //   3. Opening targeting — during the opening, with a per-game chance, the AI
 //      picks a random enemy piece and pushes its pawns to attack it.
 import { positionKey, legalMovesFor, RANKS, FILES } from './chessVariant';
+import { base44 } from '@/api/base44Client';
 
 const MATE_BOOK_KEY = 'tc-mate-book';
 const AGGRO_KEY = 'tc-ai-aggression';
@@ -20,28 +21,63 @@ const TARGET_TYPES = ['R', 'N', 'N', 'B', 'Q', 'T']; // weighted toward R/N
 // ---------------------------------------------------------------------------
 // Mate book
 // ---------------------------------------------------------------------------
+// In-memory cache of the mate book, keyed by position key. Each entry is
+// { from:[r,f], to:[r,f], mateIn:number, id?:string }. `id` is the MateBook
+// entity id once synced from the server, which lets later records update the
+// existing row instead of duplicating it. The cache is the fast path used by
+// consultMateBook during search (no server calls in the hot path).
 let _bookCache = null;
-function loadMateBook() {
-  if (_bookCache) return _bookCache;
+let _synced = false;
+
+function loadLocal() {
   try {
-    _bookCache = JSON.parse(localStorage.getItem(MATE_BOOK_KEY) || '{}');
+    return JSON.parse(localStorage.getItem(MATE_BOOK_KEY) || '{}');
   } catch {
-    _bookCache = {};
+    return {};
   }
-  return _bookCache;
 }
-function saveMateBook(b) {
-  _bookCache = b;
+function saveLocal(b) {
   try {
     localStorage.setItem(MATE_BOOK_KEY, JSON.stringify(b));
   } catch {
     // storage may be full; keep the in-memory cache
   }
 }
+function getBook() {
+  if (_bookCache) return _bookCache;
+  _bookCache = loadLocal();
+  return _bookCache;
+}
+
+// Pull the shared, server-backed mate book into the in-memory cache so the AI
+// recalls checkmates learned in any mode, session, or device. Runs once on
+// app mount; subsequent updates come from recordMate.
+export async function syncMateBookFromServer() {
+  if (_synced) return _bookCache;
+  _synced = true;
+  try {
+    const rows = await base44.entities.MateBook.list('-updated_date', 5000);
+    const b = getBook();
+    for (const row of rows || []) {
+      const k = row.position_key;
+      if (!k) continue;
+      const ex = b[k];
+      if (!ex || row.mateIn < ex.mateIn) {
+        b[k] = { from: row.from, to: row.to, mateIn: row.mateIn, id: row.id };
+      }
+    }
+    _bookCache = b;
+    saveLocal(b);
+  } catch {
+    // server unavailable (offline / not signed in) — fall back to local cache
+    if (!_bookCache) _bookCache = loadLocal();
+  }
+  return _bookCache;
+}
 
 // Look up a known mate for the side to move. Returns { move, mateIn } or null.
 export function consultMateBook(state) {
-  const b = loadMateBook();
+  const b = getBook();
   const e = b[positionKey(state)];
   if (!e) return null;
   const legal = legalMovesFor(state, e.from[0], e.from[1]);
@@ -49,17 +85,21 @@ export function consultMateBook(state) {
   return mv ? { move: mv, mateIn: e.mateIn } : null;
 }
 
-// Record the winning line of a finished self-play game. `positionList` is the
-// array of { state, lastMove } from game start to the mated position (as
-// produced by replayStates). Only the winner's positions are stored, each with
-// the move played and how many winner-moves remained to mate.
-export function recordMate(positionList) {
+// Record the winning line of a finished game. `positionList` is the array of
+// { state, lastMove } from game start to the mated position (as produced by
+// replayStates). Only the winner's positions are stored, each with the move
+// played and how many winner-moves remained to mate. Updates the in-memory
+// cache + localStorage mirror, then upserts changed entries to the server so
+// they persist across sessions and devices.
+export async function recordMate(positionList) {
   if (!positionList || positionList.length < 2) return;
   const final = positionList[positionList.length - 1].state;
   const loser = final.turn;
   const winner = loser === 'w' ? 'b' : 'w';
-  const b = loadMateBook();
+  const b = getBook();
   if (Object.keys(b).length > 20000) return; // soft cap
+  const toCreate = [];
+  const toUpdate = [];
   let changed = false;
   for (let i = 0; i < positionList.length - 1; i++) {
     const st = positionList[i].state;
@@ -73,11 +113,30 @@ export function recordMate(positionList) {
     const key = positionKey(st);
     const existing = b[key];
     if (!existing || mateIn < existing.mateIn) {
-      b[key] = { from: mv.from, to: mv.to, mateIn };
+      b[key] = { from: mv.from, to: mv.to, mateIn, id: existing?.id };
       changed = true;
+      if (existing?.id) toUpdate.push({ id: existing.id, from: mv.from, to: mv.to, mateIn });
+      else toCreate.push({ position_key: key, from: mv.from, to: mv.to, mateIn });
     }
   }
-  if (changed) saveMateBook(b);
+  if (changed) saveLocal(b);
+  // Best-effort server upsert; failures leave the local cache consistent.
+  try {
+    if (toCreate.length) {
+      const created = await base44.entities.MateBook.bulkCreate(toCreate);
+      const arr = Array.isArray(created) ? created : created?.data || created?.items || [];
+      for (const row of arr) {
+        if (row?.position_key) {
+          const ex = b[row.position_key];
+          if (ex) ex.id = row.id;
+        }
+      }
+      saveLocal(b);
+    }
+    if (toUpdate.length) await base44.entities.MateBook.bulkUpdate(toUpdate);
+  } catch {
+    // network / server failure — cached locally, retried implicitly next record
+  }
 }
 
 // ---------------------------------------------------------------------------
