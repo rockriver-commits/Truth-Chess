@@ -1,11 +1,29 @@
 // Enhanced Truth Chess AI — iterative-deepening negamax with alpha-beta,
 // a transposition table, quiescence search, MVV-LVA move ordering, and
 // difficulty levels 1-8. Plays strictly by Truth Chess rules via chessVariant.
-import { allLegalMoves, makeMove, inCheck, FILES, RANKS } from './chessVariant';
+import { allLegalMoves, makeMove, inCheck, isSquareAttacked, findKing, cloneBoard, FILES, RANKS } from './chessVariant';
 import { consultMateBook, loadAggression, OPENING_PLIES } from './aiLearning';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
+
+// A "hanging check": the moved piece delivers check, is NOT defended by any
+// friendly piece, and the opposing King can legally capture it — a free piece
+// giveaway. The AI heavily penalises these so it stops handing pieces to the
+// King. The move stays legal for everyone (standard rules unchanged).
+function isHangingCheck(board, move, color) {
+  const [tr, tf] = move.to;
+  if (isSquareAttacked(board, tr, tf, color)) return false; // checker is guarded
+  const opp = color === 'w' ? 'b' : 'w';
+  const kpos = findKing(board, opp);
+  if (!kpos) return false;
+  if (Math.abs(kpos[0] - tr) > 1 || Math.abs(kpos[1] - tf) > 1) return false; // King not adjacent
+  // Simulate the King capturing the checker; legal only if the King is then safe.
+  const b = cloneBoard(board);
+  b[kpos[0]][kpos[1]] = null;
+  b[tr][tf] = { type: 'K', color: opp };
+  return !isSquareAttacked(b, tr, tf, color);
+}
 
 // Move offsets for the attack map (kept local so we don't import engine internals).
 const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -443,7 +461,10 @@ function negamax(state, color, depth, alpha, beta, ply) {
     const ext = givesCheck && ply < 40 ? 1 : 0;
     let sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
     if (timedOut) break;
-    if (aggressive && givesCheck) sc += CHECK_BONUS;
+    if (givesCheck) {
+      if (isHangingCheck(ns.board, m, color)) sc -= VALUES[m.promotion ? 'Q' : m.piece.type];
+      else if (aggressive) sc += CHECK_BONUS;
+    }
     if (sc > best) { best = sc; bestMove = m; }
     if (best > alpha) { alpha = best; flag = FLAG.EXACT; }
     if (alpha >= beta) { flag = FLAG.LOWER; break; }
@@ -495,7 +516,10 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       const givesCheck = inCheck(ns, opp);
       const ext = givesCheck ? 1 : 0;
       let sc = -negamax(ns, opp, d - 1 + ext, -Infinity, -alpha, 1);
-      if (aggressive && givesCheck) sc += CHECK_BONUS;
+      if (givesCheck) {
+        if (isHangingCheck(ns.board, m, color)) sc -= VALUES[m.promotion ? 'Q' : m.piece.type];
+        else if (aggressive) sc += CHECK_BONUS;
+      }
       if (timedOut && d > 1) break;
       if (sc > curBestScore) { curBestScore = sc; curBest = m; }
       if (curBestScore > alpha) alpha = curBestScore;
