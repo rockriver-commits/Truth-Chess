@@ -208,7 +208,7 @@ export default function Home() {
 
   function handleSquareClick(r, f) {
     if (reviewing || gameOver || promo || submitting) return;
-    if (mode === 'cvc') return;
+    if (mode === 'cvc' || mode === 'cvc_turbo') return;
     if (mode === 'computer' && turn === 'b') return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active') return;
@@ -245,7 +245,7 @@ export default function Home() {
 
   function handleDropMove(from, to) {
     if (reviewing || gameOver || promo || submitting) return;
-    if (mode === 'cvc') return;
+    if (mode === 'cvc' || mode === 'cvc_turbo') return;
     if (mode === 'computer' && turn === 'b') return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active' || !myColor || turn !== myColor) return;
@@ -832,11 +832,11 @@ export default function Home() {
   // pursuing checkmate and never allowing threefold repetition. Move cadence
   // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
-    if (mode !== 'cvc' || gameOver || promo) return;
+    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo) return;
     // A fresh game (no moves yet) picks a new opening for this exhibition.
     if (localMoves.length === 0) openingRef.current = { book: randomOpening() };
     setThinking(true);
-    const delay = [910, 1500, 2000][Math.floor(Math.random() * 3)];
+    const delay = mode === 'cvc_turbo' ? 500 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, localState.turn);
       const scripted = bookMove(openingRef.current.book, localMoves.length, legal, localState.turn);
@@ -844,7 +844,7 @@ export default function Home() {
       if (scripted) {
         move = scripted;
       } else {
-        move = bestMove(localState, localState.turn, 6, true);
+        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 6, true);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');
@@ -956,11 +956,11 @@ export default function Home() {
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
             <div className="w-full max-w-[620px] mb-3 space-y-2">
-              <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 rounded-xl">
+              <div className="grid grid-cols-5 gap-1 p-1 bg-stone-100 rounded-xl">
                 <button
                   type="button"
                   onClick={() => changeMode('local')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
                     mode === 'local' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
                   }`}
                 >
@@ -969,7 +969,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => changeMode('computer')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
                     mode === 'computer' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
                   }`}
                 >
@@ -978,7 +978,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => changeMode('online')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
                     mode === 'online' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
                   }`}
                 >
@@ -987,11 +987,20 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => changeMode('cvc')}
-                  className={`py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
                     mode === 'cvc' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
                   }`}
                 >
                   AI vs AI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode('cvc_turbo')}
+                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
+                    mode === 'cvc_turbo' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                  }`}
+                >
+                  AI vs AI ⚡
                 </button>
               </div>
               {mode !== 'online' && (
