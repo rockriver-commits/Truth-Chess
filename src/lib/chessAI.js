@@ -154,7 +154,7 @@ function negamax(state, color, depth, alpha, beta, ply) {
   let flag = FLAG.UPPER;
   for (const m of ordered) {
     const ns = makeMove(state, m);
-    const sc = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha, ply + 1);
+    let sc = -negamax(ns, color === 'w' ? 'b' : 'w', depth - 1, -beta, -alpha, ply + 1);
     if (timedOut) break;
     if (aggressive && inCheck(ns, color === 'w' ? 'b' : 'w')) sc += CHECK_BONUS;
     if (sc > best) { best = sc; bestMove = m; }
