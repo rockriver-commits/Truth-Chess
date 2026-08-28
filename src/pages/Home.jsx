@@ -10,6 +10,7 @@ import {
   positionKey,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
+import { rollOpeningTarget, recordMate, updateAggression } from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
@@ -61,7 +62,8 @@ export default function Home() {
   // Opening book shared by AI-vs-AI and vs-Computer: a randomly chosen
   // traditional opening for the current game. The index into the book is just
   // localMoves.length, so it stays aligned with actual play.
-  const openingRef = useRef({ book: null });
+  const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
+  const recordedRef = useRef(false);
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -388,7 +390,8 @@ export default function Home() {
     setBlackClock(tc.initial);
     setStartMs(Date.now());
     setElapsed(0);
-    openingRef.current = { book: null };
+    openingRef.current = { book: null, wTarget: null, bTarget: null };
+    recordedRef.current = false;
   }
 
   function changeMode(m) {
@@ -806,15 +809,24 @@ export default function Home() {
   // plays the search engine. Never allows threefold repetition.
   useEffect(() => {
     if (mode !== 'computer' || turn !== 'b' || gameOver || promo) return;
-    if (!openingRef.current.book) openingRef.current = { book: randomOpening() };
+    if (!openingRef.current.book) {
+      openingRef.current = { book: randomOpening(), bTarget: rollOpeningTarget('b', localState.board) };
+    }
     setThinking(true);
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, 'b');
-      const scripted = bookMove(openingRef.current.book, localMoves.length, legal, 'b');
+      const scripted = openingRef.current.bTarget
+        ? null
+        : bookMove(openingRef.current.book, localMoves.length, legal, 'b');
       let move;
       if (scripted) move = scripted;
       else {
-        move = bestMove(localState, 'b', difficulty);
+        const ctx = {
+          ply: localMoves.length,
+          wTarget: null,
+          bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
+        };
+        move = bestMove(localState, 'b', difficulty, false, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');
@@ -833,18 +845,35 @@ export default function Home() {
   // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
     if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo) return;
-    // A fresh game (no moves yet) picks a new opening for this exhibition.
-    if (localMoves.length === 0) openingRef.current = { book: randomOpening() };
+    // A fresh game (no moves yet) picks a new opening for this exhibition and,
+    // per side, may roll an opening target (a random enemy piece to attack).
+    if (localMoves.length === 0) {
+      openingRef.current = {
+        book: randomOpening(),
+        wTarget: rollOpeningTarget('w', localState.board),
+        bTarget: rollOpeningTarget('b', localState.board),
+      };
+    }
     setThinking(true);
     const delay = mode === 'cvc_turbo' ? 500 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, localState.turn);
-      const scripted = bookMove(openingRef.current.book, localMoves.length, legal, localState.turn);
+      const sideTarget = localState.turn === 'w' ? openingRef.current.wTarget : openingRef.current.bTarget;
+      // If this side is in target mode this game, skip the opening book and let
+      // the search drive pawns at the chosen enemy piece.
+      const scripted = sideTarget
+        ? null
+        : bookMove(openingRef.current.book, localMoves.length, legal, localState.turn);
       let move;
       if (scripted) {
         move = scripted;
       } else {
-        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 7, true);
+        const ctx = {
+          ply: localMoves.length,
+          wTarget: openingRef.current.wTarget ? openingRef.current.wTarget.type : null,
+          bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
+        };
+        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 7, true, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');
@@ -880,6 +909,27 @@ export default function Home() {
       setPendingAdvance(true);
     }
   }, [status, turn, mode, difficulty]);
+
+  // Self-play learning (AI vs AI only): when a game ends, record the mating
+  // line into the mate book and tune aggression from how fast it ended.
+  useEffect(() => {
+    if (mode !== 'cvc' && mode !== 'cvc_turbo') {
+      recordedRef.current = false;
+      return;
+    }
+    if (!gameOver) {
+      recordedRef.current = false;
+      return;
+    }
+    if (recordedRef.current) return;
+    recordedRef.current = true;
+    if (status === 'checkmate') {
+      recordMate(positionList);
+      updateAggression(localMoves.length);
+    } else {
+      updateAggression(null);
+    }
+  }, [mode, gameOver, status, positionList, localMoves.length]);
 
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));

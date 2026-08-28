@@ -2,6 +2,7 @@
 // a transposition table, quiescence search, MVV-LVA move ordering, and
 // difficulty levels 1-8. Plays strictly by Truth Chess rules via chessVariant.
 import { allLegalMoves, makeMove, inCheck, FILES, RANKS } from './chessVariant';
+import { consultMateBook, loadAggression, OPENING_PLIES } from './aiLearning';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
@@ -156,8 +157,12 @@ function evaluate(board) {
 
   // Contempt: the side with a lead is rewarded for keeping major pieces, so it
   // retains the firepower to force checkmate rather than trading to a draw.
-  if (wMat - bMat > 100) score += wMaj * 6;
-  else if (bMat - wMat > 100) score -= bMaj * 6;
+  // Contempt: the side with a lead is rewarded for keeping major pieces, so it
+  // retains the firepower to force checkmate rather than trading to a draw.
+  // Scaled by the adaptive aggression multiplier (self-play learning).
+  const contempt = 6 * curAggressionMul;
+  if (wMat - bMat > 100) score += wMaj * contempt;
+  else if (bMat - wMat > 100) score -= bMaj * contempt;
 
   // --- Truth blockade -----------------------------------------------------
   // Truth pieces are passive blockers (uncapturable except by the enemy King),
@@ -194,7 +199,49 @@ function evaluate(board) {
     }
   }
 
+  // Opening targeting: during the opening, push our pawns toward the chosen
+  // enemy piece so they can attack it. Active only when curOpening is set.
+  if (curOpening) {
+    if (curOpening.wTarget) score += pawnAttackProgress(board, 'w', curOpening.wTarget);
+    if (curOpening.bTarget) score -= pawnAttackProgress(board, 'b', curOpening.bTarget);
+  }
+
   return score;
+}
+
+// Score a side's pawns by how close their forward attack squares are to the
+// current square of the enemy target piece (found by type). Directly attacking
+// the target square scores highest; nearer scores more.
+function pawnAttackProgress(board, hunter, targetType) {
+  const enemy = hunter === 'w' ? 'b' : 'w';
+  let sq = null;
+  for (let r = 0; r < RANKS && !sq; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = board[r][f];
+      if (p && p.color === enemy && p.type === targetType) {
+        sq = [r, f];
+        break;
+      }
+    }
+  }
+  if (!sq) return 0; // target captured — no bonus
+  const dir = hunter === 'w' ? -1 : 1;
+  let total = 0;
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = board[r][f];
+      if (!p || p.type !== 'P' || p.color !== hunter) continue;
+      for (const df of [-1, 1]) {
+        const ar = r + dir;
+        const af = f + df;
+        if (ar < 0 || ar >= RANKS || af < 0 || af >= FILES) continue;
+        const d = Math.abs(ar - sq[0]) + Math.abs(af - sq[1]);
+        if (d === 0) total += 80;
+        else total += Math.max(0, 14 - d * 2);
+      }
+    }
+  }
+  return total;
 }
 
 // --- Move ordering (MVV-LVA for captures, promotions high) -----------------
@@ -215,6 +262,8 @@ let deadline = 0;
 let timedOut = false;
 let useQuiescence = true;
 let aggressive = false;
+let curAggressionMul = 1; // adaptive contempt scaling (from self-play learning)
+let curOpening = null; // { wTarget, bTarget } — opening pawn-targeting context
 const CHECK_BONUS = 30;
 const TT = new Map();
 const FLAG = { EXACT: 0, LOWER: 1, UPPER: 2 };
@@ -297,10 +346,15 @@ function negamax(state, color, depth, alpha, beta, ply) {
   return best;
 }
 
-export function bestMove(state, color, difficulty = 4, aggressiveMode = false) {
+export function bestMove(state, color, difficulty = 4, aggressiveMode = false, ctx = null) {
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES[4];
   useQuiescence = cfg.quiescence;
   aggressive = aggressiveMode;
+  curAggressionMul = loadAggression().aggressionMul || 1;
+  curOpening =
+    ctx && ctx.ply != null && ctx.ply < OPENING_PLIES && (ctx.wTarget || ctx.bTarget)
+      ? { wTarget: ctx.wTarget || null, bTarget: ctx.bTarget || null }
+      : null;
   deadline = now() + cfg.timeMs;
   timedOut = false;
   TT.clear();
@@ -308,12 +362,19 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false) {
   const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
 
+  // Mate book: a forced mate-in-1 is always sound to play instantly; deeper
+  // remembered mates are used as a strong move-ordering hint (the search
+  // re-verifies them), so the engine gravitates toward lines it has solved.
+  const bookHit = consultMateBook(state);
+  if (bookHit && bookHit.mateIn === 1) return bookHit.move;
+
   // Weak levels: sometimes just play a random legal move.
   if (cfg.randomness > 0 && Math.random() < cfg.randomness) {
     return moves[Math.floor(Math.random() * moves.length)];
   }
 
   let ordered = orderMoves(moves);
+  if (bookHit) ordered = [bookHit.move, ...ordered.filter((m) => m !== bookHit.move)];
   let best = ordered[0];
   let bestScore = -Infinity;
   for (let d = 1; d <= cfg.depth; d++) {
