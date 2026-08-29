@@ -3,7 +3,10 @@
 // opposing Truth, and can be captured only by the opposing King or an opposing Truth.
 // Although it otherwise does not capture, it controls the squares it slides to, so it
 // can deliver check & checkmate.
-// Castling and en passant are supported. State carries castling rights + ep target.
+// New rule: a side's Truth is locked — it cannot be moved until that side has put the
+// opponent's king in check at least once. The lock is permanent once broken.
+// Castling and en passant are supported. State carries castling rights + ep target +
+// Truth-unlock flags.
 // White occupies ranks 1-2 (rows 8-7), Black occupies ranks 8-9 (rows 1-0);
 // ranks 3-7 (rows 6-2) are an empty buffer — armies start five ranks apart.
 
@@ -30,6 +33,7 @@ export function initialState() {
     castling: { w: { K: true, Q: true }, b: { K: true, Q: true } },
     ep: null,
     halfmove: 0,
+    truthUnlocked: { w: false, b: false },
   };
 }
 
@@ -306,6 +310,7 @@ export function positionKey(state) {
   s += (state.castling.w.K ? 'K' : '') + (state.castling.w.Q ? 'Q' : '')
     + (state.castling.b.K ? 'k' : '') + (state.castling.b.Q ? 'q' : '') + '|';
   s += state.ep ? state.ep[0] + ',' + state.ep[1] : '-';
+  s += '|' + (state.truthUnlocked ? (state.truthUnlocked.w ? 'W' : '') + (state.truthUnlocked.b ? 'B' : '') : '');
   return s;
 }
 
@@ -363,12 +368,23 @@ function applyMove(state, move, promoType = 'Q') {
   const resetHalf = piece.type === 'P' || !!move.captured;
   const halfmove = resetHalf ? 0 : (state.halfmove || 0) + 1;
 
-  return { board: nb, turn: piece.color === 'w' ? 'b' : 'w', castling, ep, halfmove };
+  // Carry over the Truth-unlock flags. The actual unlock (when a side delivers
+  // a check) is resolved in makeMove, so the cheap probe calls made inside
+  // legalMovesFor don't each re-run check detection.
+  const truthUnlocked = { ...(state.truthUnlocked || { w: false, b: false }) };
+
+  return { board: nb, turn: piece.color === 'w' ? 'b' : 'w', castling, ep, halfmove, truthUnlocked };
 }
 
 export function legalMovesFor(state, r, f) {
   const piece = state.board[r][f];
   if (!piece) return [];
+  // The Truth piece is locked: a side may not move its Truth until it has put
+  // the opponent's king in check at least once in the game. (A locked Truth
+  // still controls its squares and can deliver check from where it stands.)
+  if (piece.type === 'T' && !(state.truthUnlocked && state.truthUnlocked[piece.color])) {
+    return [];
+  }
   return pieceMoves(state, r, f).filter((m) => {
     const ns = applyMove(state, m, 'Q');
     return !inCheck(ns, piece.color);
@@ -395,5 +411,11 @@ export function gameStatus(state) {
 }
 
 export function makeMove(state, move, promoType = 'Q') {
-  return applyMove(state, move, promoType);
+  const ns = applyMove(state, move, promoType);
+  // Unlock the mover's Truth piece if this move puts the opponent's king in
+  // check. Once unlocked, it stays unlocked for the rest of the game.
+  const mover = state.turn;
+  const opp = mover === 'w' ? 'b' : 'w';
+  if (inCheck(ns, opp)) ns.truthUnlocked = { ...ns.truthUnlocked, [mover]: true };
+  return ns;
 }

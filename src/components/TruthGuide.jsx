@@ -86,6 +86,15 @@ export default function TruthGuide() {
         opponent for the entire game — and because it gives check, it can also be the piece that
         delivers mate.
       </p>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        <strong>The Truth is locked at the start.</strong> Neither side may move a Truth piece until
+        that side has put the <em>opponent's</em> king in check at least once. Delivering that first
+        check — with any piece — unlocks your Truth for the rest of the game; the lock never re-engages
+        once it is broken. Until then your Truths stay where they begin, still controlling their lines
+        and able to give check from a distance, but unable to be repositioned. This makes earning the
+        first check a strategic goal in itself: the side that checks first gains a mobile Truth while
+        the other side's stays frozen.
+      </p>
 
       <H2>Special moves: castling, en passant, promotion</H2>
       <p className="mt-3 text-stone-600 leading-relaxed">
@@ -118,8 +127,9 @@ export default function TruthGuide() {
       <p className="mt-2 text-stone-600 leading-relaxed">
         Use the three buffer ranks to develop your minor pieces before committing pawns. Because the
         board is wider, control of the center is shared among more files; aim your pawn advances at the
-        squares your knights and bishops want. Don't rush the Truth forward — it is most useful kept in
-        reserve where it can influence several lines at once.
+        squares your knights and bishops want. Remember your Truth is locked until you deliver the
+        first check — so your early plans are built with the other pieces, and a timely check that
+        unlocks your Truth can be an opening goal in itself.
       </p>
       <h3 className="mt-5 text-base font-semibold text-stone-700">Using the Truth as a blocker</h3>
       <p className="mt-2 text-stone-600 leading-relaxed">
