@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ChessBoard from '@/components/ChessBoard';
+import { Link } from 'react-router-dom';
 import {
   initialState,
   legalMovesFor,
@@ -1322,6 +1323,12 @@ export default function Home() {
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
                   <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>
                 </ul>
+                <Link
+                  to="/learn"
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-600 hover:underline"
+                >
+                  Read the full guide →
+                </Link>
               </div>
             )}
           </aside>
