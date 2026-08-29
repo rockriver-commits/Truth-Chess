@@ -376,7 +376,8 @@ export default function Home() {
     if (!humanToMove || hintLoading) return;
     setHintLoading(true);
     setTimeout(() => {
-      const m = bestMove(state, turn, 5);
+      const ctx = { positionKeys: positionList.map((p) => positionKey(p.state)) };
+      const m = bestMove(state, turn, 5, false, ctx);
       setHint(m);
       setHintLoading(false);
     }, 30);
@@ -840,6 +841,7 @@ export default function Home() {
           ply: localMoves.length,
           wTarget: null,
           bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
+          positionKeys: positionList.map((p) => positionKey(p.state)),
         };
         move = bestMove(localState, 'b', difficulty, false, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
@@ -903,6 +905,7 @@ export default function Home() {
           ply: localMoves.length,
           wTarget: openingRef.current.wTarget ? openingRef.current.wTarget.type : null,
           bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
+          positionKeys: positionList.map((p) => positionKey(p.state)),
         };
         move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : 7, true, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
@@ -924,7 +927,8 @@ export default function Home() {
     if (turn === myColor) return;
     setThinking(true);
     const t = setTimeout(() => {
-      const move = bestMove(state, turn, difficulty);
+      const ctx = { positionKeys: positionList.map((p) => positionKey(p.state)) };
+      const move = bestMove(state, turn, difficulty, false, ctx);
       if (move) appendMove(serializeMove(move, 'Q'));
       setThinking(false);
     }, 400);

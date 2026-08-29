@@ -1,7 +1,7 @@
 // Enhanced Truth Chess AI — iterative-deepening negamax with alpha-beta,
 // a transposition table, quiescence search, MVV-LVA move ordering, and
 // difficulty levels 1-8. Plays strictly by Truth Chess rules via chessVariant.
-import { allLegalMoves, makeMove, inCheck, isSquareAttacked, findKing, cloneBoard, FILES, RANKS } from './chessVariant';
+import { allLegalMoves, makeMove, inCheck, isSquareAttacked, findKing, cloneBoard, positionKey, FILES, RANKS } from './chessVariant';
 import { consultMateBook, loadAggression, OPENING_PLIES } from './aiLearning';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
@@ -517,6 +517,29 @@ function negamax(state, color, depth, alpha, beta, ply) {
   return best;
 }
 
+// A move "draws" if it triggers the 50-move rule, or if the resulting position
+// has already occurred twice this game (threefold repetition). The AI avoids
+// such moves unless every legal move draws.
+function isDrawingMove(state, move, positionKeys) {
+  const ns = makeMove(state, move, move.promotion ? 'Q' : 'Q');
+  if ((ns.halfmove || 0) >= 100) return true;
+  if (positionKeys && positionKeys.length) {
+    const k = positionKey(ns);
+    let occ = 0;
+    for (const hk of positionKeys) if (hk === k) occ++;
+    if (occ >= 2) return true;
+  }
+  return false;
+}
+
+// Prefer the chosen move; if it draws, pick the first (best-ordered)
+// alternative that doesn't. If every move draws, play the chosen one.
+function pickNonDrawing(state, preferred, ordered, positionKeys) {
+  if (!isDrawingMove(state, preferred, positionKeys)) return preferred;
+  const alt = ordered.find((m) => !isDrawingMove(state, m, positionKeys));
+  return alt || preferred;
+}
+
 export function bestMove(state, color, difficulty = 4, aggressiveMode = false, ctx = null) {
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES[4];
   useQuiescence = cfg.quiescence;
@@ -537,11 +560,17 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   // remembered mates are used as a strong move-ordering hint (the search
   // re-verifies them), so the engine gravitates toward lines it has solved.
   const bookHit = consultMateBook(state);
-  if (bookHit && bookHit.mateIn === 1) return bookHit.move;
+  if (bookHit && bookHit.mateIn === 1) return bookHit.move; // a forced mate is never a draw
 
-  // Weak levels: sometimes just play a random legal move.
+  // Position keys so far (including the current position) for threefold
+  // detection. Absent for callers that don't pass history — then only the
+  // 50-move rule is checked.
+  const pkeys = ctx && ctx.positionKeys ? ctx.positionKeys : null;
+
+  // Weak levels: sometimes play a random legal move — but never one that
+  // draws (threefold / 50-move) unless every move draws.
   if (cfg.randomness > 0 && Math.random() < cfg.randomness) {
-    return moves[Math.floor(Math.random() * moves.length)];
+    return pickNonDrawing(state, moves[Math.floor(Math.random() * moves.length)], moves, pkeys);
   }
 
   let ordered = orderMoves(moves);
@@ -571,5 +600,5 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
     if (timedOut) break;
     if (Math.abs(bestScore) > MATE - 1000) break;
   }
-  return best;
+  return pickNonDrawing(state, best, ordered, pkeys);
 }
