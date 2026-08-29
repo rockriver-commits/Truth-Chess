@@ -87,13 +87,14 @@ export default function TruthGuide() {
         delivers mate.
       </p>
       <p className="mt-3 text-stone-600 leading-relaxed">
-        <strong>The Truth is locked at the start.</strong> Neither side may move a Truth piece until
-        that side has put the <em>opponent's</em> king in check at least once. Delivering that first
-        check — with any piece — unlocks your Truth for the rest of the game; the lock never re-engages
-        once it is broken. Until then your Truths stay where they begin, still controlling their lines
-        and able to give check from a distance, but unable to be repositioned. This makes earning the
-        first check a strategic goal in itself: the side that checks first gains a mobile Truth while
-        the other side's stays frozen.
+        <strong>The Truth is locked at the start — for both sides.</strong> No one may move a Truth
+        piece until the first check of the game is delivered against <em>either</em> king. The moment
+        any king is put in check — whether yours or your opponent's — both players' Truth pieces
+        unlock at once, and the lock never re-engages. For example, if White is put in check, then
+        both White and Black may move their Truth from that point on. Until then the Truths stay
+        where they begin, still controlling their lines and able to give check from a distance, but
+        unable to be repositioned. This makes the first check a shared milestone: whoever delivers it
+        opens the Truth for everyone, so plan whether you want to be the one to trigger it.
       </p>
 
       <H2>Special moves: castling, en passant, promotion</H2>
@@ -127,9 +128,9 @@ export default function TruthGuide() {
       <p className="mt-2 text-stone-600 leading-relaxed">
         Use the three buffer ranks to develop your minor pieces before committing pawns. Because the
         board is wider, control of the center is shared among more files; aim your pawn advances at the
-        squares your knights and bishops want. Remember your Truth is locked until you deliver the
-        first check — so your early plans are built with the other pieces, and a timely check that
-        unlocks your Truth can be an opening goal in itself.
+        squares your knights and bishops want. Remember both sides' Truth is locked until the first
+        check of the game lands on either king — so your early plans are built with the other pieces,
+        and the first check (whoever delivers it) unlocks Truth for both players at once.
       </p>
       <h3 className="mt-5 text-base font-semibold text-stone-700">Using the Truth as a blocker</h3>
       <p className="mt-2 text-stone-600 leading-relaxed">
