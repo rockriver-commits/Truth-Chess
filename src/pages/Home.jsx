@@ -29,6 +29,8 @@ import { isMobileApp } from '@/lib/isMobileApp';
 import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
+import TruthGuide from '@/components/TruthGuide';
+import { loadAdSense } from '@/lib/adsense';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -115,6 +117,10 @@ export default function Home() {
   useEffect(() => {
     syncMateBookFromServer();
   }, []);
+
+  // The game page carries substantial written content (the TruthGuide section
+  // below the board), so AdSense is loaded here too. Removed on unmount.
+  useEffect(() => loadAdSense(), []);
 
   const isPro = me?.plan === 'pro';
   // Base44 Payments can't sell digital subscriptions inside mobile app stores,
@@ -1337,6 +1343,7 @@ export default function Home() {
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
+          <TruthGuide />
         </div>
       </div>
 
