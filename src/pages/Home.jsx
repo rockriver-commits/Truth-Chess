@@ -1045,8 +1045,7 @@ export default function Home() {
               </svg>
             </span>
             , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
-            truth pieces and can put the king in Check — but it's <em>locked</em> for both sides and can't move
-            until the first check of the game is delivered against either king. Conversely, the King can take the Truth.
+            truth pieces and can put the king in Check. Conversely, the King can take the Truth.
           </p>
         </header>
 
@@ -1313,7 +1312,7 @@ export default function Home() {
                     • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
                     Queen. It captures only the opposing Truth, and can be captured only by the opposing King
                     or an opposing Truth — otherwise it acts as a passive blocker. It controls the squares it
-                    slides to, so it can deliver check and checkmate. Both sides' Truth pieces are <span className="font-medium text-stone-800">locked</span> and cannot be moved until the first check of the game is delivered against either king — that first check unlocks Truth for both players.
+                    slides to, so it can deliver check and checkmate. The Truth is free to move from the start, just like any other piece.
                   </li>
                   <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
                   <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>

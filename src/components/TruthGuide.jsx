@@ -87,14 +87,12 @@ export default function TruthGuide() {
         delivers mate.
       </p>
       <p className="mt-3 text-stone-600 leading-relaxed">
-        <strong>The Truth is locked at the start — for both sides.</strong> No one may move a Truth
-        piece until the first check of the game is delivered against <em>either</em> king. The moment
-        any king is put in check — whether yours or your opponent's — both players' Truth pieces
-        unlock at once, and the lock never re-engages. For example, if White is put in check, then
-        both White and Black may move their Truth from that point on. Until then the Truths stay
-        where they begin, still controlling their lines and able to give check from a distance, but
-        unable to be repositioned. This makes the first check a shared milestone: whoever delivers it
-        opens the Truth for everyone, so plan whether you want to be the one to trigger it.
+        <strong>The Truth is free to move from the very first move.</strong> There is no lock and no
+        unlocking condition — you can develop, reposition, or attack with your Truth at any time, just
+        like any other piece. Its only limits are the ones above: it captures only the opposing Truth,
+        and only the opposing king or opposing Truth can capture it. Because it is both mobile and
+        nearly impossible to remove, the Truth is active from the opening onward, shaping the center
+        and delivering checks whenever an open line appears.
       </p>
 
       <H2>Special moves: castling, en passant, promotion</H2>
@@ -128,9 +126,9 @@ export default function TruthGuide() {
       <p className="mt-2 text-stone-600 leading-relaxed">
         Use the three buffer ranks to develop your minor pieces before committing pawns. Because the
         board is wider, control of the center is shared among more files; aim your pawn advances at the
-        squares your knights and bishops want. Remember both sides' Truth is locked until the first
-        check of the game lands on either king — so your early plans are built with the other pieces,
-        and the first check (whoever delivers it) unlocks Truth for both players at once.
+        squares your knights and bishops want. The Truth is free to move from the start, so you can
+        also use it early to claim an open line or plant a blockade — just remember it is hard to
+        remove once placed.
       </p>
       <h3 className="mt-5 text-base font-semibold text-stone-700">Using the Truth as a blocker</h3>
       <p className="mt-2 text-stone-600 leading-relaxed">
