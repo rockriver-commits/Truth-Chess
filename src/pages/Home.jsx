@@ -41,8 +41,7 @@ const MODES = [
   { key: 'local', label: '2 Players', pro: true },
   { key: 'computer', label: 'vs Computer', pro: false },
   { key: 'online', label: 'Online', pro: true },
-  { key: 'cvc', label: 'AI vs AI', pro: false },
-  { key: 'cvc_turbo', label: 'AI vs AI Turbo', pro: true, turbo: true },
+  { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true },
 ];
 
 const TIME_CONTROLS = {
@@ -1353,7 +1352,6 @@ export default function Home() {
             <ul className="space-y-2 text-sm text-stone-600 mb-4">
               <li>• 2-Player local mode</li>
               <li>• Online multiplayer</li>
-              <li>• AI vs AI Turbo</li>
               <li>• Copy & email game moves</li>
               <li>• AI levels 4–8 for stronger play</li>
             </ul>
