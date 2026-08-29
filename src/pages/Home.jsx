@@ -132,7 +132,16 @@ export default function Home() {
   // below the board), so AdSense is loaded here too. Removed on unmount.
   useEffect(() => loadAdSense(), []);
 
-  const isPro = me?.plan === 'pro';
+  // TEMP dev bypass: lets you test Pro-only features (Online, 2-Player, share
+  // moves, AI levels 4-8) without paying. Toggle it in the Game controls card.
+  // Defaults ON; uncheck to re-enable the paywall. Remove before launch.
+  const [devProBypass, setDevProBypass] = useState(
+    () => localStorage.getItem('tc-dev-pro') !== '0'
+  );
+  useEffect(() => {
+    localStorage.setItem('tc-dev-pro', devProBypass ? '1' : '0');
+  }, [devProBypass]);
+  const isPro = me?.plan === 'pro' || devProBypass;
   // Base44 Payments can't sell digital subscriptions inside mobile app stores,
   // so the Pro upgrade path is only shown in browsers (web), not the native apps.
   const canUpgrade = !isMobileApp();
@@ -1232,6 +1241,15 @@ export default function Home() {
                   </Button>
                 )}
               </div>
+              <label className="flex items-center gap-2 pt-1 text-[0.65rem] text-stone-500">
+                <input
+                  type="checkbox"
+                  checked={devProBypass}
+                  onChange={(e) => setDevProBypass(e.target.checked)}
+                  className="accent-amber-600"
+                />
+                Dev: Pro bypass (testing)
+              </label>
             </div>
 
             {(showDifficulty || mode === 'computer') && (
