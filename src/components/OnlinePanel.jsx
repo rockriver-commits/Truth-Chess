@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ChatPanel from '@/components/ChatPanel';
@@ -40,10 +41,22 @@ export default function OnlinePanel({
       <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-5">
         <div className="space-y-1.5">
           <p className="text-xs uppercase tracking-widest text-stone-400">Play online</p>
-          <Button onClick={onQuickMatch} className="w-full">Quick Match</Button>
-          <p className="text-[0.7rem] text-stone-400">
-            Join an open game, or start a new one if none are waiting.
-          </p>
+          {!myId ? (
+            <div className="space-y-2">
+              <p className="text-sm text-stone-500">You need an account to play online.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Link to="/login"><Button className="w-full">Sign in</Button></Link>
+                <Link to="/register"><Button variant="outline" className="w-full">Register</Button></Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Button onClick={onQuickMatch} className="w-full">Quick Match</Button>
+              <p className="text-[0.7rem] text-stone-400">
+                Join an open game, or start a new one if none are waiting.
+              </p>
+            </>
+          )}
         </div>
 
         <div>
