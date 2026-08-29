@@ -34,6 +34,17 @@ import { loadAdSense } from '@/lib/adsense';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
+// Game modes. Pro-only modes are gated behind the upgrade prompt on web and
+// hidden on mobile (where Pro can't be purchased). vs Computer and AI vs AI
+// are always free.
+const MODES = [
+  { key: 'local', label: '2 Players', pro: true },
+  { key: 'computer', label: 'vs Computer', pro: false },
+  { key: 'online', label: 'Online', pro: true },
+  { key: 'cvc', label: 'AI vs AI', pro: false },
+  { key: 'cvc_turbo', label: 'AI vs AI Turbo', pro: true, turbo: true },
+];
+
 const TIME_CONTROLS = {
   unlimited: { label: 'Unlimited', initial: null, inc: 0 },
   '3+2': { label: '3+2 Blitz', initial: 180, inc: 2 },
@@ -126,6 +137,7 @@ export default function Home() {
   // Base44 Payments can't sell digital subscriptions inside mobile app stores,
   // so the Pro upgrade path is only shown in browsers (web), not the native apps.
   const canUpgrade = !isMobileApp();
+  const visibleModes = MODES.filter((m) => !m.pro || isPro || canUpgrade);
 
   // Free users are capped at AI level 3; clamp if they lose Pro mid-session.
   useEffect(() => {
@@ -416,6 +428,17 @@ export default function Home() {
     resetLocal();
   }
 
+  // Selecting a Pro-only mode as a non-Pro user opens the upgrade prompt (web)
+  // instead of switching. On mobile, where Pro can't be purchased, gated modes
+  // are hidden from the selector entirely.
+  function guardedChangeMode(m) {
+    if (MODES.find((x) => x.key === m)?.pro && !isPro) {
+      if (canUpgrade) setShowPro(true);
+      return;
+    }
+    changeMode(m);
+  }
+
   // --- online operations -------------------------------------------------
   async function ensureUser() {
     if (me) return me;
@@ -428,20 +451,13 @@ export default function Home() {
     }
   }
 
-  // Free users get 3 online games/day; Pro is unlimited.
-  async function onlineQuotaRemaining() {
-    if (!me) return 0;
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    try {
-      const [w, b] = await Promise.all([
-        base44.entities.Game.filter({ white_player_id: me.id, created_date: { $gte: start.toISOString() } }),
-        base44.entities.Game.filter({ black_player_id: me.id, created_date: { $gte: start.toISOString() } }),
-      ]);
-      return Math.max(0, 3 - ((w?.length || 0) + (b?.length || 0)));
-    } catch {
-      return 3;
-    }
+  // Online play is a Pro feature. Free users are prompted to upgrade (web) or
+  // see a locked message (mobile, where Pro can't be purchased).
+  function requirePro() {
+    if (isPro) return true;
+    setOnlineError(canUpgrade ? 'Pro feature — upgrade to unlock.' : 'Pro feature.');
+    if (canUpgrade) setShowPro(true);
+    return false;
   }
 
   async function createOnline() {
@@ -452,14 +468,7 @@ export default function Home() {
         setOnlineError('Sign in to play online.');
         return;
       }
-      if (!isPro) {
-        const rem = await onlineQuotaRemaining();
-        if (rem <= 0) {
-          setOnlineError(canUpgrade ? 'Daily free online limit reached — upgrade to Pro.' : 'Daily free online limit reached.');
-          if (canUpgrade) setShowPro(true);
-          return;
-        }
-      }
+      if (!requirePro()) return;
       const code = generateCode();
       const rec = await base44.entities.Game.create({
         code,
@@ -486,6 +495,7 @@ export default function Home() {
         setOnlineError('Sign in to play online.');
         return;
       }
+      if (!requirePro()) return;
       const found = await base44.entities.Game.filter({
         code: code.toUpperCase(),
         status: 'waiting',
@@ -648,14 +658,7 @@ export default function Home() {
       setOnlineError('Sign in to play online.');
       return;
     }
-    if (!isPro) {
-      const rem = await onlineQuotaRemaining();
-      if (rem <= 0) {
-        setOnlineError(canUpgrade ? 'Daily free online limit reached — upgrade to Pro.' : 'Daily free online limit reached.');
-        if (canUpgrade) setShowPro(true);
-        return;
-      }
-    }
+    if (!requirePro()) return;
     try {
       const open = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
       const joinable = (open || []).find(
@@ -721,6 +724,7 @@ export default function Home() {
       setOnlineError('Sign in to play online.');
       return;
     }
+    if (!requirePro()) return;
     try {
       const code = generateCode();
       const rec = await base44.entities.Game.create({
@@ -1049,52 +1053,25 @@ export default function Home() {
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
             <div className="w-full max-w-[620px] mb-3 space-y-2">
-              <div className="grid grid-cols-5 gap-1 p-1 bg-stone-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => changeMode('local')}
-                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                    mode === 'local' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  2 Players
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('computer')}
-                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                    mode === 'computer' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  vs Computer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('online')}
-                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                    mode === 'online' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  Online
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('cvc')}
-                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                    mode === 'cvc' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  AI vs AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode('cvc_turbo')}
-                  className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                    mode === 'cvc_turbo' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-                  }`}
-                >
-                  AI vs AI Turbo <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}>⚡</span>
-                </button>
+              <div
+                className="grid gap-1 p-1 bg-stone-100 rounded-xl"
+                style={{ gridTemplateColumns: `repeat(${visibleModes.length}, minmax(0, 1fr))` }}
+              >
+                {visibleModes.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => guardedChangeMode(m.key)}
+                    className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
+                      mode === m.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                    }`}
+                  >
+                    {m.label}
+                    {m.turbo && (
+                      <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}> ⚡</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
             {state ? (
@@ -1161,7 +1138,15 @@ export default function Home() {
                 </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
-                <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
+                {isPro && <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />}
+                {!isPro && canUpgrade && (
+                  <ShareMoves
+                    sans={moveSanDisplay}
+                    resultStr={resultStr}
+                    locked
+                    onLocked={() => setShowPro(true)}
+                  />
+                )}
                 {gameOver && positionList.length > 1 && (
                   <ReplayBar
                     index={reviewIdx}
@@ -1365,9 +1350,11 @@ export default function Home() {
               </button>
             </div>
             <ul className="space-y-2 text-sm text-stone-600 mb-4">
-              <li>• Unlock AI levels 4–8 for stronger play</li>
-              <li>• Unlimited online games (free: 3/day)</li>
-              <li>• Support ongoing development</li>
+              <li>• 2-Player local mode</li>
+              <li>• Online multiplayer</li>
+              <li>• AI vs AI Turbo</li>
+              <li>• Copy & email game moves</li>
+              <li>• AI levels 4–8 for stronger play</li>
             </ul>
             <p className="text-sm font-medium text-stone-800 mb-3">$2.99/month · cancel anytime</p>
             <Button onClick={upgrade} disabled={upgrading} className="w-full">
