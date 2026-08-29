@@ -135,6 +135,24 @@ function buildAttackMap(board) {
   }
 }
 
+// Does a Truth of `color` attack (r,f) via an unblocked queen-style slide?
+// (Truth moves like a queen, so this is the same line scan; the piece on the
+// target square itself is skipped so a Truth doesn't "attack" its own square.)
+function truthAttacksSquare(board, r, f, color) {
+  for (const [dr, df] of ROOK_DIRS.concat(BISHOP_DIRS)) {
+    let ar = r + dr, af = f + df;
+    while (ar >= 0 && ar < RANKS && af >= 0 && af < FILES) {
+      const p = board[ar][af];
+      if (p) {
+        if (p.type === 'T' && p.color === color) return true;
+        break;
+      }
+      ar += dr; af += df;
+    }
+  }
+  return false;
+}
+
 function evaluate(board) {
   let score = 0;
   const fc = (FILES - 1) / 2; // 4.5
@@ -255,8 +273,9 @@ function evaluate(board) {
   if (wMat - bMat > 100) score += wMaj * contempt;
   else if (bMat - wMat > 100) score -= bMaj * contempt;
 
-  // Hanging valuable pieces (N/B/R/Q): one attacked by a lesser enemy piece, or
-  // attacked by the enemy king with no defender, is "given up for free". Penalize,
+  // Hanging major pieces (R/N/B/Q) and Truth (T): a piece attacked by a lesser
+  // enemy piece, or by the enemy king with no defender, is "given up for free" —
+  // the attacker should be guarded or the trade should be fair. Penalize that,
   // relaxed when the owner is ~4 pieces up (sacrifices to force mate are fine).
   // Evaluated only for non-quiescence levels — quiescence already resolves these
   // captures at higher levels, so this keeps low levels safe without slowing them.
@@ -266,24 +285,47 @@ function evaluate(board) {
     for (let r = 0; r < RANKS; r++) {
       for (let f = 0; f < FILES; f++) {
         const p = board[r][f];
-        if (!p || (p.type !== 'N' && p.type !== 'B' && p.type !== 'R' && p.type !== 'Q')) continue;
+        if (!p) continue;
+        const isMajor = p.type === 'N' || p.type === 'B' || p.type === 'R' || p.type === 'Q';
+        const isTruth = p.type === 'T';
+        if (!isMajor && !isTruth) continue;
         const pv = VALUES[p.type];
         const i = r * FILES + f;
-        if (p.color === 'w') {
-          if (wMat - bMat >= RELAX) continue;
-          const ev = _bAtk[i];
-          if (ev > 0 && ev < pv) {
-            const def = _wAtk[i];
-            const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
-            if (unsafe) score -= (pv - ev) * 0.4;
+        if (isMajor) {
+          if (p.color === 'w') {
+            if (wMat - bMat >= RELAX) continue;
+            const ev = _bAtk[i];
+            if (ev > 0 && ev < pv) {
+              const def = _wAtk[i];
+              const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
+              if (unsafe) score -= (pv - ev) * 0.4;
+            }
+          } else {
+            if (bMat - wMat >= RELAX) continue;
+            const ev = _wAtk[i];
+            if (ev > 0 && ev < pv) {
+              const def = _bAtk[i];
+              const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
+              if (unsafe) score += (pv - ev) * 0.4;
+            }
           }
         } else {
-          if (bMat - wMat >= RELAX) continue;
-          const ev = _wAtk[i];
-          if (ev > 0 && ev < pv) {
-            const def = _bAtk[i];
-            const unsafe = ev === 1 ? def === 0 : def === 0 || def > ev;
-            if (unsafe) score += (pv - ev) * 0.4;
+          // Truth (T) is only capturable by the enemy King or an enemy Truth.
+          // A Truth attacking an opponent's major piece should be guarded (by
+          // our King or our Truth) or the trade should be fair — penalize a
+          // Truth that is attacked with no recapture available.
+          if (p.color === 'w' && wMat - bMat >= RELAX) continue;
+          if (p.color === 'b' && bMat - wMat >= RELAX) continue;
+          const enemy = p.color === 'w' ? 'b' : 'w';
+          const atkMap = p.color === 'w' ? _bAtk : _wAtk;
+          const defMap = p.color === 'w' ? _wAtk : _bAtk;
+          const kingAtk = atkMap[i] === 1;
+          const truthAtk = truthAttacksSquare(board, r, f, enemy);
+          if (!kingAtk && !truthAtk) continue;
+          const guarded = defMap[i] === 1 || truthAttacksSquare(board, r, f, p.color);
+          if (!guarded) {
+            if (p.color === 'w') score -= pv * 0.4;
+            else score += pv * 0.4;
           }
         }
       }
