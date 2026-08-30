@@ -24,6 +24,7 @@ export default function OnlinePanel({
   onReenterOwn,
   onStartGhost,
   onWatch,
+  onRefresh,
   onLeave,
   onResign,
   onOfferDraw,
@@ -125,13 +126,13 @@ export default function OnlinePanel({
           </div>
         </div>
 
-        {watchable.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-px bg-stone-200 flex-1" />
-              <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">spectate</span>
-              <div className="h-px bg-stone-200 flex-1" />
-            </div>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-px bg-stone-200 flex-1" />
+            <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">watch live games</span>
+            <div className="h-px bg-stone-200 flex-1" />
+          </div>
+          {watchable.length > 0 ? (
             <div className="space-y-2">
               {watchable.map((g) => (
                 <div
@@ -145,8 +146,15 @@ export default function OnlinePanel({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2">
+              <span className="text-sm text-stone-400">No live games right now.</span>
+              <Button size="sm" variant="outline" onClick={onRefresh}>
+                Refresh
+              </Button>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="h-px bg-stone-200 flex-1" />

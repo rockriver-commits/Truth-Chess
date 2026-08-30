@@ -1312,6 +1312,7 @@ export default function Home() {
                 onReenterOwn={reenterOwn}
                 onStartGhost={startGhost}
                 onWatch={watchGame}
+                onRefresh={refreshOpenGames}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
                 onOfferDraw={offerDrawOnline}
