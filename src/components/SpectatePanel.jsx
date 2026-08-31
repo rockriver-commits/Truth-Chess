@@ -9,9 +9,13 @@ import { RefreshCw } from 'lucide-react';
 // so it's obvious the refresh is working even when no games are live.
 export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh }) {
   const [refreshing, setRefreshing] = useState(false);
-  const watchable = (activeGames || []).filter(
-    (g) => g.white_player_id !== myId && g.black_player_id !== myId && g.black_player_id !== '__ghost__'
-  );
+  const watchable = (activeGames || []).filter((g) => {
+    if (g.black_player_id === '__ghost__') return false;
+    // vs-Computer games are watchable by anyone, including the player who
+    // started them (so they can spectate their own game from another device).
+    if (g.black_player_id === '__computer__') return true;
+    return g.white_player_id !== myId && g.black_player_id !== myId;
+  });
 
   async function handleRefresh() {
     if (refreshing) return;
@@ -37,7 +41,12 @@ export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh })
               key={g.id}
               className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
             >
-              <span className="font-mono text-sm tracking-widest text-stone-700">{g.code}</span>
+              <span className="flex items-baseline gap-2 min-w-0">
+                <span className="font-mono text-sm tracking-widest text-stone-700">{g.code}</span>
+                {g.black_player_id === '__computer__' && (
+                  <span className="text-[0.65rem] uppercase tracking-wide text-amber-600 shrink-0">vs Computer</span>
+                )}
+              </span>
               <Button size="sm" variant="outline" onClick={() => onWatch(g)}>
                 Watch
               </Button>

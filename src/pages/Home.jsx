@@ -88,6 +88,8 @@ export default function Home() {
   const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
   const recordedRef = useRef(false);
   const kingOnlySinceRef = useRef(null);
+  const computerGameRef = useRef(null);
+  const computerBroadcastRef = useRef({ queue: [], gameOver: false, status: 'playing', turn: 'w', processing: false });
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -123,6 +125,9 @@ export default function Home() {
   const [activeGames, setActiveGames] = useState([]);
   const [ghostOpponent, setGhostOpponent] = useState(false);
   const [spectator, setSpectator] = useState(false);
+  // vs-Computer games broadcast to the live-games list so other devices can
+  // spectate them, just like online games.
+  const [computerGame, setComputerGame] = useState(null);
 
   useEffect(() => {
     base44.auth.me()
@@ -179,6 +184,18 @@ export default function Home() {
   useEffect(() => {
     syncMateBookFromServer();
     refreshOpenGames();
+  }, []);
+
+  // Global live-games refresh: any Game change (a vs-Computer game starting,
+  // an online move, a game finishing) re-fetches the open/active lists so the
+  // lobby and "watch live games" panel stay current on every device, not just
+  // the one playing online.
+  useEffect(() => {
+    const unsub = base44.entities.Game.subscribe(() => {
+      refreshOpenGames();
+    });
+    return () => { if (unsub) unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The game page carries substantial written content (the TruthGuide section
@@ -446,6 +463,7 @@ export default function Home() {
   }
 
   function resetLocal() {
+    cleanupComputerBroadcast();
     setLocalState(initialState());
     setSelected(null);
     setLegalMoves([]);
@@ -794,6 +812,68 @@ export default function Home() {
     }
   }
 
+  // --- vs-Computer broadcast --------------------------------------------
+  // Mirrors the local vs-Computer game into a Game record (black = '__computer__')
+  // so it shows up in the live-games list and can be spectated from other
+  // devices. The record is created on the first move and kept in sync as moves
+  // are made; it's deleted when the game is reset, the mode changes, or the
+  // page unmounts so finished/abandoned computer games don't accumulate.
+  async function processComputerBroadcast() {
+    const ref = computerBroadcastRef.current;
+    if (ref.processing) return;
+    ref.processing = true;
+    try {
+      // Loop so a move that arrives mid-flight gets synced too.
+      while (true) {
+        const moves = ref.queue;
+        if (!moves || moves.length === 0) break;
+        const id = computerGameRef.current?.id;
+        const payload = {
+          moves,
+          last_move_at: new Date().toISOString(),
+          status: ref.gameOver ? 'finished' : 'active',
+          result: ref.gameOver
+            ? ref.status === 'checkmate'
+              ? ref.turn === 'w' ? 'black_wins' : 'white_wins'
+              : 'draw'
+            : null,
+        };
+        try {
+          if (!id) {
+            const rec = await base44.entities.Game.create({
+              code: generateCode(),
+              host_color: 'w',
+              white_player_id: identity.id,
+              black_player_id: '__computer__',
+              ...payload,
+            });
+            computerGameRef.current = rec;
+            setComputerGame(rec);
+          } else {
+            const updated = await base44.entities.Game.update(id, payload);
+            computerGameRef.current = updated;
+            setComputerGame(updated);
+          }
+        } catch {
+          // ignore transient failures
+        }
+        if (ref.queue === moves) break;
+      }
+    } finally {
+      ref.processing = false;
+    }
+  }
+
+  async function cleanupComputerBroadcast() {
+    const g = computerGameRef.current;
+    computerGameRef.current = null;
+    setComputerGame(null);
+    computerBroadcastRef.current.queue = [];
+    if (g) {
+      try { await base44.entities.Game.delete(g.id); } catch { /* ignore */ }
+    }
+  }
+
   // realtime subscription: active-game updates + live lobby refresh + sounds
   useEffect(() => {
     if (mode !== 'online') return;
@@ -825,6 +905,30 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onlineGame?.id]);
+
+  // vs-Computer broadcast trigger: whenever the local move list changes in
+  // computer mode, push the latest position to the server.
+  useEffect(() => {
+    if (mode !== 'computer') return;
+    computerBroadcastRef.current.queue = localMoves;
+    computerBroadcastRef.current.gameOver = gameOver;
+    computerBroadcastRef.current.status = status;
+    computerBroadcastRef.current.turn = turn;
+    if (localMoves.length === 0) return;
+    processComputerBroadcast();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, localMoves, gameOver, status, turn]);
+
+  // Delete the vs-Computer broadcast record if the page unmounts mid-game so
+  // it doesn't linger as an "active" game no one is playing.
+  useEffect(() => {
+    return () => {
+      const g = computerGameRef.current;
+      if (g) {
+        base44.entities.Game.delete(g.id).catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (mode === 'online' && onlineGame?.status === 'active') {
@@ -1329,7 +1433,7 @@ export default function Home() {
             ) : null}
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-5">
             <div className="w-full max-w-md">
               <LobbyPanel
                 online={online}
@@ -1338,6 +1442,16 @@ export default function Home() {
                 onJoinGame={joinSpecific}
               />
             </div>
+            {!(mode === 'online' && onlineGame && onlineGame.status === 'active') && (
+              <div className="w-full max-w-md">
+                <SpectatePanel
+                  activeGames={activeGames}
+                  myId={identity.id}
+                  onWatch={watchGame}
+                  onRefresh={refreshOpenGames}
+                />
+              </div>
+            )}
           </div>
 
           <aside className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
@@ -1365,15 +1479,6 @@ export default function Home() {
                 onOfferDraw={offerDrawOnline}
                 onAcceptDraw={acceptDrawOnline}
                 onDeclineDraw={declineDrawOnline}
-              />
-            )}
-
-            {!(mode === 'online' && onlineGame && onlineGame.status === 'active') && (
-              <SpectatePanel
-                activeGames={activeGames}
-                myId={identity.id}
-                onWatch={watchGame}
-                onRefresh={refreshOpenGames}
               />
             )}
 
