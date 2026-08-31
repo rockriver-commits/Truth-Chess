@@ -19,6 +19,7 @@ import { useChessSounds } from '@/hooks/useChessSounds';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import OnlinePanel from '@/components/OnlinePanel';
+import SpectatePanel from '@/components/SpectatePanel';
 import Leaderboard from '@/components/Leaderboard';
 import MoveHistory from '@/components/MoveHistory';
 import ReplayBar from '@/components/ReplayBar';
@@ -126,6 +127,7 @@ export default function Home() {
   // learned in any mode, any session, on any device.
   useEffect(() => {
     syncMateBookFromServer();
+    refreshOpenGames();
   }, []);
 
   // The game page carries substantial written content (the TruthGuide section
@@ -1311,13 +1313,20 @@ export default function Home() {
                 onJoinGame={joinSpecific}
                 onReenterOwn={reenterOwn}
                 onStartGhost={startGhost}
-                onWatch={watchGame}
-                onRefresh={refreshOpenGames}
                 onLeave={leaveOnline}
                 onResign={resignOnline}
                 onOfferDraw={offerDrawOnline}
                 onAcceptDraw={acceptDrawOnline}
                 onDeclineDraw={declineDrawOnline}
+              />
+            )}
+
+            {!(mode === 'online' && onlineGame && onlineGame.status === 'active') && (
+              <SpectatePanel
+                activeGames={activeGames}
+                myId={me?.id}
+                onWatch={watchGame}
+                onRefresh={refreshOpenGames}
               />
             )}
 

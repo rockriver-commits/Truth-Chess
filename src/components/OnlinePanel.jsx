@@ -23,8 +23,6 @@ export default function OnlinePanel({
   onJoinGame,
   onReenterOwn,
   onStartGhost,
-  onWatch,
-  onRefresh,
   onLeave,
   onResign,
   onOfferDraw,
@@ -35,9 +33,6 @@ export default function OnlinePanel({
 
   if (!onlineGame) {
     const games = openGames || [];
-    const watchable = (activeGames || []).filter(
-      (g) => g.white_player_id !== myId && g.black_player_id !== myId && g.black_player_id !== '__ghost__'
-    );
     return (
       <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-5">
         <div className="space-y-1.5">
@@ -124,36 +119,6 @@ export default function OnlinePanel({
               Join
             </Button>
           </div>
-        </div>
-
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-px bg-stone-200 flex-1" />
-            <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">watch live games</span>
-            <div className="h-px bg-stone-200 flex-1" />
-          </div>
-          {watchable.length > 0 ? (
-            <div className="space-y-2">
-              {watchable.map((g) => (
-                <div
-                  key={g.id}
-                  className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
-                >
-                  <span className="font-mono text-sm tracking-widest text-stone-700">{g.code}</span>
-                  <Button size="sm" variant="outline" onClick={() => onWatch(g)}>
-                    Watch
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2">
-              <span className="text-sm text-stone-400">No live games right now.</span>
-              <Button size="sm" variant="outline" onClick={onRefresh}>
-                Refresh
-              </Button>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
