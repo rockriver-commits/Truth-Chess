@@ -762,13 +762,16 @@ export default function Home() {
       }
       const liveWaiting = (waiting || []).filter((g) => !stale.find((s) => s.id === g.id));
       setOpenGames(liveWaiting);
-      // Also prune active games that never got off the ground: an active game
-      // with zero moves untouched for 30 minutes means both players left —
-      // delete it so it stops showing in "watch live games".
+      // Prune any active game that's been abandoned — no move activity for 30
+      // minutes means no one is playing it (a closed tab, a dropped connection,
+      // a vs-Computer game left mid-match). This catches both zero-move games
+      // that never started and games with moves whose player walked away, so
+      // the "watch live games" list only shows games someone is actually
+      // playing. Skip the game this client is currently in.
       const activeCutoff = Date.now() - 30 * 60 * 1000;
       const staleActive = (active || []).filter((g) => {
         if (onlineGame && g.id === onlineGame.id) return false;
-        if ((g.moves || []).length > 0) return false;
+        if (computerGameRef.current && g.id === computerGameRef.current.id) return false;
         const ts = g.last_move_at ? Date.parse(g.last_move_at) : Date.parse(g.created_date);
         return !isNaN(ts) && ts < activeCutoff;
       });
@@ -977,9 +980,13 @@ export default function Home() {
   useEffect(() => { onlineGameRef.current = onlineGame; }, [onlineGame]);
   useEffect(() => { myColorRef.current = myColor; }, [myColor]);
 
-  // Forfeit an active online game if the player closes the tab outright.
+  // Forfeit an active online game and delete the vs-Computer broadcast
+  // record if the player closes the tab outright — otherwise both linger as
+  // "active" games no one is playing.
   useEffect(() => {
     function onBeforeUnload() {
+      const cg = computerGameRef.current;
+      if (cg) base44.entities.Game.delete(cg.id).catch(() => {});
       const g = onlineGameRef.current;
       const mc = myColorRef.current;
       if (!g || g.status !== 'active' || !mc) return;
