@@ -1151,9 +1151,10 @@ export default function Home() {
             <Button
               onClick={donate}
               disabled={upgrading}
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-3 h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
             >
-              {upgrading ? 'Redirecting…' : '💛 Support — $5'}
+              <span>💛</span>
+              <span className="hidden sm:inline">{upgrading ? 'Redirecting…' : 'Support — $5'}</span>
             </Button>
           </div>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto text-center">
