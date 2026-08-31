@@ -1192,7 +1192,7 @@ export default function Home() {
                     size="sm"
                     variant={soundOn ? 'default' : 'outline'}
                     onClick={() => setSoundOn((s) => !s)}
-                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur justify-start gap-2"
+                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur text-stone-900 justify-start gap-2"
                   >
                     {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                     Sound
