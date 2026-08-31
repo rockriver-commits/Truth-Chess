@@ -722,7 +722,9 @@ export default function Home() {
 
   function watchGame(game) {
     setOnlineError('');
+    setMode('online');
     setSpectator(true);
+    setGhostOpponent(false);
     prevMovesLen.current = game.moves?.length || 0;
     setOnlineGame(game);
   }
