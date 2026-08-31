@@ -142,12 +142,24 @@ export default function Home() {
     }
     guestIdRef.current = g;
   }
+  // Stable random 9-digit tag appended to guest display names in the lobby,
+  // so each anonymous visitor is distinguishable (e.g. "Anonymous482913075").
+  const guestTagRef = useRef(null);
+  if (guestTagRef.current === null) {
+    let tag = null;
+    try { tag = localStorage.getItem('tc_guest_tag'); } catch (e) {}
+    if (!tag) {
+      tag = String(Math.floor(100000000 + Math.random() * 900000000));
+      try { localStorage.setItem('tc_guest_tag', tag); } catch (e) {}
+    }
+    guestTagRef.current = tag;
+  }
   const identity = useMemo(() => {
     if (me) {
       const name = me.player_name || me.data?.player_name || '';
       return { id: me.id, player_name: name, is_guest: false };
     }
-    return { id: guestIdRef.current, player_name: 'Anonymous', is_guest: true };
+    return { id: guestIdRef.current, player_name: `Anonymous${guestTagRef.current}`, is_guest: true };
   }, [me]);
   const online = usePresence(identity);
 
