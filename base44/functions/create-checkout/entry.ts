@@ -83,6 +83,11 @@ Deno.serve(async (req: Request) => {
         currency: "USD",
         frequency: "MONTH",
       },
+      donation: {
+        name: "Support Truth Chess — Donation",
+        price: "5.00",
+        currency: "USD",
+      },
     };
     const product = PRODUCTS[productId];
     if (!product) {

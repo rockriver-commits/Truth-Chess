@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
@@ -19,6 +20,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [donate, setDonate] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,6 +47,17 @@ export default function Register() {
       const result = await base44.auth.verifyOtp({ email, otpCode });
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
+      }
+      if (donate) {
+        try {
+          const res = await base44.functions.invoke("create-checkout", { productId: "donation" });
+          if (res?.data?.redirectUrl) {
+            window.location.href = res.data.redirectUrl;
+            return;
+          }
+        } catch {
+          // fall through to normal redirect
+        }
       }
       window.location.href = safeReturnTo();
     } catch (err) {
@@ -215,6 +228,17 @@ export default function Register() {
               required
             />
           </div>
+        </div>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="donate"
+            checked={donate}
+            onCheckedChange={setDonate}
+            className="mt-0.5"
+          />
+          <Label htmlFor="donate" className="text-sm font-normal leading-snug cursor-pointer">
+            Yes! Add a <strong>$5 donation</strong> to support development. (Optional — the game is free either way.)
+          </Label>
         </div>
         <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
           {loading ? (

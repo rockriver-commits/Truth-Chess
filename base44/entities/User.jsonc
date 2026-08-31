@@ -19,13 +19,18 @@
     },
     "games_played": {
       "type": "number",
-      "description": "Completed games by this user, used for the 55-game free trial.",
+      "description": "Completed games by this user.",
       "default": 0
     },
     "bonus_games": {
       "type": "number",
-      "description": "Extra trial games earned by beating the computer.",
+      "description": "Achievement points earned by beating the computer / first mate of the day.",
       "default": 0
+    },
+    "last_mate_date": {
+      "type": "string",
+      "description": "Local date (YYYY-MM-DD) of the player's last checkmate win, for the first-mate-of-the-day reward.",
+      "default": ""
     }
   },
   "required": [

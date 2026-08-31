@@ -146,25 +146,13 @@ export default function Home() {
   // below the board), so AdSense is loaded here too. Removed on unmount.
   useEffect(() => loadAdSense(), []);
 
-  const isPro = me?.plan === 'pro';
-  const gamesPlayed = me?.games_played || 0;
   const bonusGames = me?.bonus_games || 0;
-  const gamesAllowed = TRIAL_GAMES + bonusGames;
-  const trialActive = !!me && gamesPlayed < gamesAllowed;
-  // Free trial: everyone gets all modes for their first 55 games, then the Pro
-  // paywall applies. Beating the computer earns bonus games. Admins and Pro
-  // subscribers always have full access.
-  const hasAccess = isPro || me?.role === 'admin' || trialActive;
-  const gamesRemaining = Math.max(0, gamesAllowed - gamesPlayed);
-  // Base44 Payments can't sell digital subscriptions inside mobile app stores,
-  // so the Pro upgrade path is only shown in browsers (web), not the native apps.
-  const canUpgrade = !isMobileApp();
-  const visibleModes = MODES.filter((m) => !m.pro || hasAccess || canUpgrade);
-
-  // Users without access are capped at AI level 3; clamp if they lose access.
-  useEffect(() => {
-    if (!hasAccess && difficulty > 3) setDifficulty(3);
-  }, [hasAccess, difficulty]);
+  // Truth Chess is free for everyone — no paywall. All modes and AI levels are
+  // open. bonus_games is a fun achievement counter (beat the computer / first
+  // mate of the day), shown as a badge.
+  const hasAccess = true;
+  const canUpgrade = false;
+  const visibleModes = MODES;
 
   const onlineDerived = useMemo(() => {
     if (mode !== 'online' || !onlineGame) return null;
@@ -661,6 +649,21 @@ export default function Home() {
     setUpgrading(false);
   }
 
+  async function donate() {
+    setUpgrading(true);
+    try {
+      const res = await base44.functions.invoke('create-checkout', { productId: 'donation' });
+      if (res?.data?.redirectUrl) {
+        window.location.href = res.data.redirectUrl;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    setUpgrading(false);
+    toast({ title: 'Could not start donation', description: 'Please try again later.' });
+  }
+
   async function refreshOpenGames() {
     try {
       const [waiting, active] = await Promise.all([
@@ -1005,21 +1008,33 @@ export default function Home() {
       mode === 'local' || mode === 'computer' || (mode === 'online' && !spectator);
     if (!isParticipant || !me) return;
     countedRef.current = true;
-    // Beat the computer (player is White) → award a bonus trial game.
+    const today = new Date().toLocaleDateString('en-CA');
+    // Did the player deliver checkmate this game?
+    const playerWon = status === 'checkmate' && (
+      mode === 'local' ||
+      (mode === 'computer' && turn === 'b') ||
+      (mode === 'online' && !spectator && myColor &&
+        ((myColor === 'w' && turn === 'b') || (myColor === 'b' && turn === 'w')))
+    );
     const beatComputer = mode === 'computer' && status === 'checkmate' && turn === 'b';
-    const patch = { games_played: (me.games_played || 0) + 1 };
+    const firstMateOfDay = playerWon && (me.last_mate_date || '') !== today;
+    let bonusDelta = 0;
     if (beatComputer) {
-      patch.bonus_games = (me.bonus_games || 0) + 1;
-      toast({
-        title: '🏆 You beat the computer!',
-        description: '+1 free game added to your trial.',
-      });
+      bonusDelta += 1;
+      toast({ title: '🏆 You beat the computer!', description: '+1 to your score.' });
     }
+    if (firstMateOfDay) {
+      bonusDelta += 1;
+      toast({ title: '🥇 First mate of the day!', description: 'Nice win — +1 to your score.' });
+    }
+    const patch = { games_played: (me.games_played || 0) + 1 };
+    if (bonusDelta > 0) patch.bonus_games = (me.bonus_games || 0) + bonusDelta;
+    if (firstMateOfDay) patch.last_mate_date = today;
     base44.auth.updateMe(patch)
       .then((u) => setMe(u))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, spectator, me, status, turn]);
+  }, [mode, gameOver, spectator, me, status, turn, myColor]);
 
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));
@@ -1129,6 +1144,15 @@ export default function Home() {
             , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
             truth pieces and can put the king in Check. Conversely, the King can take the Truth.
           </p>
+          <div className="mt-5 flex justify-center">
+            <Button
+              onClick={donate}
+              disabled={upgrading}
+              className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-6 h-11 rounded-full shadow-sm"
+            >
+              {upgrading ? 'Redirecting…' : '💛 Support Truth Chess — $5'}
+            </Button>
+          </div>
         </header>
 
         {!meLoaded ? (
@@ -1249,7 +1273,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
                 <span className="text-xs font-medium text-amber-600">
-                  {isPro ? '⚡ Pro' : me?.role === 'admin' ? '⚡ Admin' : hasAccess ? `Trial · ${gamesRemaining} left${bonusGames ? ` (+${bonusGames})` : ''}` : ''}
+                  {me?.role === 'admin' ? '⚡ Admin' : bonusGames ? `🏆 ${bonusGames}` : ''}
                 </span>
               </div>
               {!hasAccess && canUpgrade && (

@@ -9,9 +9,8 @@ export default function RegisterToPlayCard() {
     <div className="max-w-md mx-auto rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-8 text-center space-y-4">
       <h2 className="text-2xl font-display font-semibold text-stone-800">Register to play</h2>
       <p className="text-sm text-stone-500 leading-relaxed">
-        Create a free account to start playing. Your first 55 games are free across every mode —
-        beat the computer to earn bonus games. After the trial, upgrade to Pro to keep playing
-        2-Player, Online, and the higher AI levels.
+        Create a free account to start playing. Truth Chess is free for everyone — all modes and
+        AI levels are open. If you'd like, donate $5 to support development.
       </p>
       <div className="grid grid-cols-2 gap-3 pt-2">
         <Link to="/register"><Button className="w-full">Create account</Button></Link>
