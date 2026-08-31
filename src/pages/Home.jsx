@@ -1178,17 +1178,20 @@ export default function Home() {
                 </nav>
                 <div className="flex flex-col gap-1.5 mt-auto mb-8">
                   {mode !== 'online' && (
-                    <select
-                      value={timeControl}
-                      onChange={(e) => setTimeControl(e.target.value)}
-                      className="h-8 px-2 text-xs rounded-lg border border-stone-300 bg-white/90 backdrop-blur text-stone-700"
-                    >
-                      {Object.keys(TIME_CONTROLS).map((k) => (
-                        <option key={k} value={k}>
-                          {TIME_CONTROLS[k].label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[0.6rem] uppercase tracking-widest text-stone-400 px-1">Time Control</p>
+                      <select
+                        value={timeControl}
+                        onChange={(e) => setTimeControl(e.target.value)}
+                        className="h-8 px-2 text-xs rounded-lg border border-stone-300 bg-white/90 backdrop-blur text-stone-700"
+                      >
+                        {Object.keys(TIME_CONTROLS).map((k) => (
+                          <option key={k} value={k}>
+                            {TIME_CONTROLS[k].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
                   {(mode === 'local' || mode === 'computer') && !gameOver && (
                     <div className="flex gap-1.5">
