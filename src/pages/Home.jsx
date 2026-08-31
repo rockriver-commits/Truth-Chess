@@ -39,7 +39,6 @@ import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import ResignFlowBanner from '@/components/ResignFlowBanner';
-import TruthGuide from '@/components/TruthGuide';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
@@ -1466,14 +1465,30 @@ export default function Home() {
                 </g>
               </svg>
             </h1>
-            <Button
-              onClick={donate}
-              disabled={upgrading}
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
-            >
-              <span>💛</span>
-              <span className="hidden sm:inline">{upgrading ? 'Redirecting…' : 'Support — $5'}</span>
-            </Button>
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
+              <Button
+                onClick={donate}
+                disabled={upgrading}
+                className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
+              >
+                <span>💛</span>
+                <span className="hidden sm:inline">{upgrading ? 'Redirecting…' : 'Support — $5'}</span>
+              </Button>
+              <Link
+                to="/feedback"
+                className="inline-flex items-center justify-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
+              >
+                <span>💬</span>
+                <span className="hidden sm:inline">Comment</span>
+              </Link>
+              <Link
+                to="/learn"
+                className="inline-flex items-center justify-center gap-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
+              >
+                <span>📖</span>
+                <span className="hidden sm:inline">Learn</span>
+              </Link>
+            </div>
           </div>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto text-center">
             On a ten×9 board with a piece that seeks Truth from the king{' '}
@@ -1742,7 +1757,6 @@ export default function Home() {
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
-          <TruthGuide />
         </div>
       </div>
 

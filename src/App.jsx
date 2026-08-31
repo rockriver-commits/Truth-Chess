@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import Learn from '@/pages/Learn';
 import ThankYou from '@/pages/ThankYou';
+import Feedback from '@/pages/Feedback';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -48,6 +49,7 @@ const AuthenticatedApp = () => {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Home />} />
       <Route path="/learn" element={<Learn />} />
+      <Route path="/feedback" element={<Feedback />} />
       <Route path="/ThankYou" element={<ThankYou />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
