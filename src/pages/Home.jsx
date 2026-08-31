@@ -1171,7 +1171,7 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
+        <div className="flex flex-col gap-8">
           <div className="flex flex-col items-center">
             {state && mode !== 'online' && timeControl !== 'unlimited' && (
               <div className="w-full max-w-[540px] mb-2">
@@ -1322,7 +1322,7 @@ export default function Home() {
             ) : null}
           </div>
 
-          <aside className="space-y-5">
+          <aside className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
             {me && !identity.player_name && (
               <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
             )}
