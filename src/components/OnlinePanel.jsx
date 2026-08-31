@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import ChatPanel from '@/components/ChatPanel';
+
 
 // Online lobby, streamlined around a single "Play Online" action that finds an
 // open game or starts a new one. Private host/join-by-code is kept as an
@@ -141,7 +141,6 @@ export default function OnlinePanel({
         </Button>
         {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
       </div>
-      <ChatPanel gameCode={onlineGame.code} userId={myId} />
     </div>
   );
 }
