@@ -1077,7 +1077,7 @@ export default function Home() {
   // The board itself, shared between the in-flow (player) layout and the
   // sticky (spectator) layout so the ChessBoard props stay in one place.
   const boardEl = (
-    <div className="relative w-full max-w-[540px]">
+    <div className="relative w-full max-w-[900px]">
       <ChessBoard
         board={viewState.board}
         selected={reviewing ? null : selected}
@@ -1098,7 +1098,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">
-      <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
+      <div className="max-w-7xl mx-auto px-4 py-10 sm:py-14">
         {/* When spectating, pin the board to the top of the page wrapper (whose
             height is the full page) so position:sticky holds for the whole
             scroll and everything else moves beneath it. */}
@@ -1263,7 +1263,7 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col items-center min-w-0">
+              <div className="flex flex-col items-center min-w-0 flex-1">
                 {state ? (
                   !spectator ? (
                     <div className="my-3 w-full flex justify-center">{boardEl}</div>

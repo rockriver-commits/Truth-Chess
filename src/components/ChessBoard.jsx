@@ -114,7 +114,7 @@ export default function ChessBoard({
   }
 
   return (
-    <div className="w-full max-w-[620px] mx-auto select-none">
+    <div className="w-full max-w-[920px] mx-auto select-none">
       <div className="relative">
         <div
           ref={gridRef}
