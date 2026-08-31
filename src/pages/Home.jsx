@@ -1206,17 +1206,7 @@ export default function Home() {
         {/* When spectating, pin the board to the top of the page wrapper (whose
             height is the full page) so position:sticky holds for the whole
             scroll and everything else moves beneath it. */}
-        {spectator && state && (
-          <div className="sticky top-0 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-stone-100 via-stone-100 to-stone-100/95 backdrop-blur-sm flex justify-center items-center gap-3">
-            {boardEl}
-            <p
-              key={statusText + turn}
-              className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
-            >
-              {statusText}
-            </p>
-          </div>
-        )}
+
         <header className="relative mb-8">
           <p className="text-center text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600/80">
             A Chess Variant
