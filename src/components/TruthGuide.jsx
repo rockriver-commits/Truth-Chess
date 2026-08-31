@@ -1,4 +1,5 @@
 import React from 'react';
+import OpeningsGallery from '@/components/OpeningsGallery';
 
 // The Truth Chess guide — substantial publisher content shared by the game
 // page and the dedicated /learn page. Keeping it in one component avoids
@@ -154,6 +155,17 @@ export default function TruthGuide() {
         your own Truth out of the enemy king's reach. Passed pawns with a clear path to promotion are
         especially valuable here.
       </p>
+
+      <H2>Truth Chess openings — a starter repertoire</H2>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        The Veritas engine plays from a repertoire of twenty-three traditional openings adapted
+        to the 10×9 board. Below are six of the most instructive, each shown as the exact position
+        the engine reaches after its scripted opening moves. Files run a–j left to right; the
+        Queen stands on the e-file and the King on the f-file, with a Truth flanking each. Early
+        self-play data is still thin, but the queen's-pawn opening has been the strongest so far —
+        two wins and a draw from its first three recorded games.
+      </p>
+      <OpeningsGallery />
 
       <H2>Frequently asked questions</H2>
       <p className="mt-3 text-stone-600 leading-relaxed">
