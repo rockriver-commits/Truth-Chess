@@ -1,14 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 // Always-visible "watch live games" panel. Shown on the home page in every
 // mode so anyone can spectate an active game at any time — even while playing
 // a local or computer game. Lists active, non-ghost games the viewer isn't
-// already part of; empty state offers a manual refresh.
+// already part of; empty state offers a manual refresh with a spinning icon
+// so it's obvious the refresh is working even when no games are live.
 export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh }) {
+  const [refreshing, setRefreshing] = useState(false);
   const watchable = (activeGames || []).filter(
     (g) => g.white_player_id !== myId && g.black_player_id !== myId && g.black_player_id !== '__ghost__'
   );
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-3">
@@ -32,8 +46,11 @@ export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh })
         </div>
       ) : (
         <div className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2">
-          <span className="text-sm text-stone-400">No live games right now.</span>
-          <Button size="sm" variant="outline" onClick={onRefresh}>
+          <span className="text-sm text-stone-400">
+            {refreshing ? 'Checking for live games…' : 'No live games right now.'}
+          </span>
+          <Button size="sm" variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={refreshing ? 'animate-spin' : ''} />
             Refresh
           </Button>
         </div>
