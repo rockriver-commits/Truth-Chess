@@ -24,7 +24,6 @@ import SpectatePanel from '@/components/SpectatePanel';
 import Leaderboard from '@/components/Leaderboard';
 import MoveHistory from '@/components/MoveHistory';
 import ReplayBar from '@/components/ReplayBar';
-import ThemePicker from '@/components/ThemePicker';
 import ClockBar from '@/components/ClockBar';
 import StatsPanel from '@/components/StatsPanel';
 import { isMobileApp } from '@/lib/isMobileApp';
@@ -105,8 +104,6 @@ export default function Home() {
   const [localMoves, setLocalMoves] = useState([]);
   const [drawAgreed, setDrawAgreed] = useState(false);
   const [reviewIdx, setReviewIdx] = useState(null);
-  const [boardTheme, setBoardTheme] = useState(() => localStorage.getItem('tc-board-theme') || 'classic');
-  const [pieceStyle, setPieceStyle] = useState(() => localStorage.getItem('tc-piece-style') || 'figurine');
   const [timeControl, setTimeControl] = useState('unlimited');
   const [whiteClock, setWhiteClock] = useState(null);
   const [blackClock, setBlackClock] = useState(null);
@@ -114,9 +111,6 @@ export default function Home() {
   const [animateMove, setAnimateMove] = useState(null);
   const [showPro, setShowPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-
-  useEffect(() => localStorage.setItem('tc-board-theme', boardTheme), [boardTheme]);
-  useEffect(() => localStorage.setItem('tc-piece-style', pieceStyle), [pieceStyle]);
 
   // online
   const [me, setMe] = useState(null);
@@ -1063,10 +1057,30 @@ export default function Home() {
         flipped={effectiveFlipped}
         checkSquare={viewCheck}
         hintMove={reviewing ? null : hint}
-        boardTheme={boardTheme}
-        pieceStyle={pieceStyle}
+        boardTheme="classic"
+        pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+      <div className="absolute top-1/2 -translate-y-1/2 left-1.5 flex flex-col gap-1.5 z-20 pointer-events-none">
+        {mode !== 'online' && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={resetLocal}
+            className="pointer-events-auto h-7 px-2 text-[0.65rem] bg-white/85 backdrop-blur border-stone-300"
+          >
+            Reset
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant={soundOn ? 'default' : 'outline'}
+          onClick={() => setSoundOn((s) => !s)}
+          className="pointer-events-auto h-7 px-2 text-[0.65rem] bg-white/85 backdrop-blur"
+        >
+          {soundOn ? '🔊' : '🔇'}
+        </Button>
+      </div>
     </div>
   );
 
@@ -1195,43 +1209,22 @@ export default function Home() {
               {state && (
                 <div className="flex flex-col justify-between self-stretch py-3">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                  <div className="flex flex-col items-center gap-1">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                        turn === 'w' ? 'bg-white ring-1 ring-stone-400' : 'bg-stone-900'
+                      }`}
+                    />
+                    <p className="text-[0.7rem] font-semibold text-stone-600 text-center leading-tight whitespace-nowrap">
+                      {statusText}
+                    </p>
+                  </div>
                   <CapturedSide pieces={viewCaptured.w} label="White captured" />
                 </div>
               )}
             </div>
             {state ? (
               <>
-                <div className="w-full max-w-[540px] mx-auto mt-1 flex items-center justify-between gap-3">
-                  <p
-                    className={`text-base font-medium ${
-                      status === 'checkmate' ? 'text-rose-600' : 'text-stone-800'
-                    }`}
-                  >
-                    {statusText}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    {mode !== 'online' && (
-                      <Button size="sm" variant="outline" onClick={resetLocal}>
-                        Reset
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant={soundOn ? 'default' : 'outline'}
-                      onClick={() => setSoundOn((s) => !s)}
-                    >
-                      {soundOn ? 'Sound On' : 'Sound Off'}
-                    </Button>
-                  </div>
-                </div>
-                <div className="w-full max-w-[540px] mx-auto mt-2">
-                  <ThemePicker
-                    boardTheme={boardTheme}
-                    pieceStyle={pieceStyle}
-                    onBoardTheme={setBoardTheme}
-                    onPieceStyle={setPieceStyle}
-                  />
-                </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
                 {hasAccess ? (
