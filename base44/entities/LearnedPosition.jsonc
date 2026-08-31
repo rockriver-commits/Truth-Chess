@@ -1,0 +1,39 @@
+{
+  "name": "LearnedPosition",
+  "type": "object",
+  "properties": {
+    "position_key": {
+      "type": "string",
+      "description": "Stable position key (board + turn + castling + en-passant)."
+    },
+    "from": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "to": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "wins": {
+      "type": "number",
+      "default": 0
+    },
+    "draws": {
+      "type": "number",
+      "default": 0
+    },
+    "losses": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "position_key",
+    "from",
+    "to"
+  ]
+}

@@ -2,7 +2,16 @@
 // a transposition table, quiescence search, MVV-LVA move ordering, and
 // difficulty levels 1-8. Plays strictly by Truth Chess rules via chessVariant.
 import { allLegalMoves, makeMove, inCheck, isSquareAttacked, findKing, cloneBoard, positionKey, FILES, RANKS } from './chessVariant';
-import { consultMateBook, loadAggression, OPENING_PLIES } from './aiLearning';
+import {
+  consultMateBook,
+  consultMateBookMirrored,
+  loadAggression,
+  OPENING_PLIES,
+  getLearnedMoveScores,
+  getPersistentBestMove,
+  setPersistentBestMove,
+  loadEvalWeights,
+} from './aiLearning';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
@@ -197,9 +206,9 @@ function evaluate(board) {
       let v = VALUES[p.type];
       const centerDist = Math.abs(f - fc) + Math.abs(r - rc);
       const centerness = 4.5 - centerDist;
-      if (p.type === 'N' || p.type === 'B') v += centerness * 3;
-      else if (p.type === 'P') v += centerness * 4;
-      else if (p.type === 'T') v += centerness * 1.5;
+      if (p.type === 'N' || p.type === 'B') v += centerness * 3 * curWeights.center;
+      else if (p.type === 'P') v += centerness * 4 * curWeights.center;
+      else if (p.type === 'T') v += centerness * 1.5 * curWeights.center;
       if (p.type === 'P') {
         // White pawns start on row 7 (rank 2), promote at row 0; Black the mirror.
         const adv = p.color === 'w' ? 7 - r : r - 1;
@@ -212,7 +221,7 @@ function evaluate(board) {
           if (board[rr][f]) { clear = false; break; }
         }
         if (clear) {
-          v += (adv + 1) * (2 + 8 * egPhase);
+          v += (adv + 1) * (2 + 8 * egPhase) * curWeights.passedPawn;
         } else {
           let passed = true;
           for (let df = -1; df <= 1 && passed; df++) {
@@ -223,11 +232,11 @@ function evaluate(board) {
               if (op && op.type === 'P' && op.color !== p.color) { passed = false; break; }
             }
           }
-          if (passed) v += (adv + 1) * (1 + 4 * egPhase);
+          if (passed) v += (adv + 1) * (1 + 4 * egPhase) * curWeights.passedPawn;
         }
       }
       if (p.type === 'K') {
-        if (f <= 1 || f >= 8) v -= 18 * mg; // middlegame: discourage edge king
+        if (f <= 1 || f >= 8) v -= 18 * mg * curWeights.kingSafety; // middlegame: discourage edge king
         const dir = p.color === 'w' ? -1 : 1;
         let shield = 0;
         for (let df = -1; df <= 1; df++) {
@@ -238,7 +247,7 @@ function evaluate(board) {
             if (sp && sp.type === 'P' && sp.color === p.color) shield++;
           }
         }
-        v += shield * 12 * mg; // middlegame: pawn shield
+        v += shield * 12 * mg * curWeights.kingSafety; // middlegame: pawn shield
         v += centerness * 6 * egPhase; // endgame: centralize the king
       }
       score += p.color === 'w' ? v : -v;
@@ -262,11 +271,11 @@ function evaluate(board) {
   if (egPhase > 0) {
     if (wK) for (const t of bT) {
       const d = chebyshev(wK, t);
-      if (d < 10) score += egPhase * (10 - d) * 3;
+      if (d < 10) score += egPhase * (10 - d) * 3 * curWeights.truthHunt;
     }
     if (bK) for (const t of wT) {
       const d = chebyshev(bK, t);
-      if (d < 10) score -= egPhase * (10 - d) * 3;
+      if (d < 10) score -= egPhase * (10 - d) * 3 * curWeights.truthHunt;
     }
   }
 
@@ -274,8 +283,9 @@ function evaluate(board) {
   // retains the firepower to force checkmate rather than trading to a draw.
   // Contempt: the side with a lead is rewarded for keeping major pieces, so it
   // retains the firepower to force checkmate rather than trading to a draw.
-  // Scaled by the adaptive aggression multiplier (self-play learning).
-  const contempt = 6 * curAggressionMul;
+  // Scaled by the adaptive aggression multiplier (self-play learning) and the
+  // tunable contempt weight (Texel-style self-tuning).
+  const contempt = 6 * curAggressionMul * curWeights.contempt;
   if (wMat - bMat > 100) score += wMaj * contempt;
   else if (bMat - wMat > 100) score -= bMaj * contempt;
 
@@ -458,6 +468,11 @@ let useQuiescence = true;
 let aggressive = false;
 let curAggressionMul = 1; // adaptive contempt scaling (from self-play learning)
 let curOpening = null; // { wTarget, bTarget } — opening pawn-targeting context
+// Tunable eval weights (self-play Texel-style tuning) and the learned
+// win-rate scores for the root position, both populated at the start of each
+// bestMove call so the hot evaluate() path never touches storage.
+let curWeights = { kingSafety: 1, contempt: 1, truthHunt: 1, center: 1, passedPawn: 1 };
+let curLearnedScores = null; // Map moveKey -> 0..1, or null
 const CHECK_BONUS = 30;
 const TT = new Map();
 const FLAG = { EXACT: 0, LOWER: 1, UPPER: 2 };
@@ -623,6 +638,8 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   useQuiescence = cfg.quiescence;
   aggressive = aggressiveMode;
   curAggressionMul = loadAggression().aggressionMul || 1;
+  curWeights = loadEvalWeights();
+  curLearnedScores = getLearnedMoveScores(state);
   curOpening =
     ctx && ctx.ply != null && ctx.ply < OPENING_PLIES && (ctx.wTarget || ctx.bTarget)
       ? { wTarget: ctx.wTarget || null, bTarget: ctx.bTarget || null }
@@ -637,11 +654,15 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
 
-  // Mate book: a forced mate-in-1 is always sound to play instantly; deeper
-  // remembered mates are used as a strong move-ordering hint (the search
-  // re-verifies them), so the engine gravitates toward lines it has solved.
-  const bookHit = consultMateBook(state);
-  if (bookHit && bookHit.mateIn === 1) return bookHit.move; // a forced mate is never a draw
+  // Mate book (with mirrored fallback): a forced mate-in-1 is always sound to
+  // play instantly; deeper remembered mates are used as a strong move-ordering
+  // hint (the search re-verifies them), so the engine gravitates toward lines
+  // it has solved — now also covering the symmetric wing of the board.
+  const bookHit = consultMateBookMirrored(state);
+  if (bookHit && bookHit.mateIn === 1) {
+    setPersistentBestMove(state, bookHit.move);
+    return bookHit.move; // a forced mate is never a draw
+  }
 
   // Position keys so far (including the current position) for threefold
   // detection. Absent for callers that don't pass history — then only the
@@ -655,6 +676,23 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   }
 
   let ordered = orderMoves(moves);
+  // Result-weighted root ordering: learned self-play win-rates promote
+  // historically-winning moves to the front of the search (the search still
+  // re-verifies them), and a persisted best-move hint seeds the ordering like a
+  // transposition-table best move so the engine reaches its trusted move fast.
+  if (curLearnedScores && curLearnedScores.size) {
+    ordered = moves
+      .map((m) => ({ m, s: 1e6 * (curLearnedScores.get(`${m.from[0]},${m.from[1]},${m.to[0]},${m.to[1]}`) || 0) }))
+      .sort((a, b) => b.s - a.s)
+      .map((x) => x.m);
+  }
+  const persistHint = getPersistentBestMove(state);
+  if (persistHint) {
+    const hi = ordered.find(
+      (m) => m.from[0] === persistHint.from[0] && m.from[1] === persistHint.from[1] && m.to[0] === persistHint.to[0] && m.to[1] === persistHint.to[1]
+    );
+    if (hi) ordered = [hi, ...ordered.filter((m) => m !== hi)];
+  }
   if (bookHit) ordered = [bookHit.move, ...ordered.filter((m) => m !== bookHit.move)];
   let best = ordered[0];
   let bestScore = -Infinity;
@@ -685,5 +723,9 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
     if (timedOut) break;
     if (Math.abs(bestScore) > MATE - 1000) break;
   }
-  return pickNonDrawing(state, best || ordered[0], ordered, pkeys);
+  const chosen = pickNonDrawing(state, best || ordered[0], ordered, pkeys);
+  // Persist the chosen move so the next game reaches it faster (cross-game
+  // move memory). Skipped for one-off mate-in-1 hits (already persisted above).
+  setPersistentBestMove(state, chosen);
+  return chosen;
 }

@@ -11,7 +11,15 @@ import {
   positionKey,
 } from '@/lib/chessVariant';
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
-import { rollOpeningTarget, recordMate, updateAggression, syncMateBookFromServer } from '@/lib/aiLearning';
+import {
+  rollOpeningTarget,
+  recordMate,
+  updateAggression,
+  syncMateBookFromServer,
+  syncLearnedPositionsFromServer,
+  recordGameResult,
+  tuneEvalWeights,
+} from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
@@ -188,6 +196,7 @@ export default function Home() {
   // learned in any mode, any session, on any device.
   useEffect(() => {
     syncMateBookFromServer();
+    syncLearnedPositionsFromServer();
     refreshOpenGames();
   }, []);
 
@@ -1191,6 +1200,10 @@ export default function Home() {
   // the winning line into the shared, server-backed mate book so the AI can
   // recall it later — in any mode, session, or device. Adaptive aggression
   // tuning stays a self-play (AI vs AI) signal only.
+  // Self-play position memory (#1/#2): record the position→move→outcome for
+  // every AI-driven game so the engine's root ordering learns from its own
+  // games. Eval-weight tuning (#3) and idle mate-book deepening (#5) run here
+  // too; vs-Computer exhibitions feed the shared memory just like AI vs AI.
   useEffect(() => {
     if (!gameOver) {
       recordedRef.current = false;
@@ -1198,15 +1211,33 @@ export default function Home() {
     }
     if (recordedRef.current) return;
     const isCvc = mode === 'cvc' || mode === 'cvc_turbo';
+    const isAiMode = isCvc || mode === 'computer' || (mode === 'online' && ghostOpponent);
     if (status === 'checkmate') {
       recordedRef.current = true;
       recordMate(positionList);
       if (isCvc) updateAggression(localMoves.length);
-    } else if (isCvc && (status === 'stalemate' || status === 'fifty_move' || threefold)) {
+      if (isAiMode) {
+        const result = turn === 'w' ? 'b' : 'w';
+        recordGameResult(positionList, result);
+        if (isCvc || ghostOpponent) tuneEvalWeights(positionList, result);
+      }
+    } else if (status === 'stalemate' || status === 'fifty_move' || threefold || drawAgreed) {
       recordedRef.current = true;
-      updateAggression(null);
+      if (isCvc) updateAggression(null);
+      if (isAiMode) {
+        recordGameResult(positionList, 'draw');
+        if (isCvc || ghostOpponent) tuneEvalWeights(positionList, 'draw');
+      }
+    } else if (resigned && isAiMode) {
+      recordedRef.current = true;
+      const result = turn === 'w' ? 'b' : 'w';
+      recordGameResult(positionList, result);
+    } else if (timedOut && isAiMode) {
+      recordedRef.current = true;
+      const result = timedOut === 'w' ? 'b' : 'w';
+      recordGameResult(positionList, result);
     }
-  }, [mode, gameOver, status, threefold, positionList, localMoves.length]);
+  }, [mode, gameOver, status, threefold, drawAgreed, resigned, timedOut, ghostOpponent, positionList, localMoves.length, turn]);
 
   function advance() {
     setDifficulty((d) => Math.min(10, d + 1));
