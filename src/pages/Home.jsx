@@ -89,7 +89,7 @@ export default function Home() {
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
-  const [autoFlip, setAutoFlip] = useState(true);
+  const [autoFlip, setAutoFlip] = useState(false);
   const [hint, setHint] = useState(null);
   const [hintLoading, setHintLoading] = useState(false);
   const [resigned, setResigned] = useState(false);
