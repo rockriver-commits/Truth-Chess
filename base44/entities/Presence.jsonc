@@ -1,0 +1,32 @@
+{
+  "name": "Presence",
+  "type": "object",
+  "properties": {
+    "identity_id": {
+      "type": "string",
+      "description": "User id for registered players, or a stable guest id for anonymous visitors."
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Display name; empty or 'Anonymous' for guests."
+    },
+    "is_guest": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "identity_id",
+    "last_seen"
+  ],
+  "rls": {
+    "read": {},
+    "create": {},
+    "update": {},
+    "delete": {}
+  }
+}

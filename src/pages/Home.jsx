@@ -32,6 +32,9 @@ import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
 import EmailListPanel from '@/components/EmailListPanel';
+import LobbyPanel from '@/components/LobbyPanel';
+import PlayerNameCard from '@/components/PlayerNameCard';
+import { usePresence } from '@/hooks/usePresence';
 import { loadAdSense } from '@/lib/adsense';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
@@ -128,6 +131,38 @@ export default function Home() {
       .catch(() => { setMe(null); });
   }, []);
 
+  // Stable identity for online play: registered users use their account;
+  // guests (not signed in) get a stable localStorage id and show as Anonymous.
+  const guestIdRef = useRef(null);
+  if (!guestIdRef.current) {
+    let g = null;
+    try { g = localStorage.getItem('tc_guest_id'); } catch (e) {}
+    if (!g) {
+      g = 'guest_' + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem('tc_guest_id', g); } catch (e) {}
+    }
+    guestIdRef.current = g;
+  }
+  const identity = useMemo(() => {
+    if (me) {
+      const name = me.player_name || me.data?.player_name || '';
+      return { id: me.id, player_name: name, is_guest: false };
+    }
+    return { id: guestIdRef.current, player_name: 'Anonymous', is_guest: true };
+  }, [me]);
+  const online = usePresence(identity);
+
+  // Persist a chosen player name on the user's account (registered only).
+  async function savePlayerName(name) {
+    try {
+      await base44.auth.updateMe({ player_name: name });
+      setMe((m) => (m ? { ...m, player_name: name } : m));
+      toast({ title: 'Player name saved' });
+    } catch (e) {
+      toast({ title: 'Could not save name', description: 'Please try again.' });
+    }
+  }
+
   // Load the shared, server-backed mate book so the AI recalls checkmates
   // learned in any mode, any session, on any device.
   useEffect(() => {
@@ -150,11 +185,11 @@ export default function Home() {
   }, [mode, onlineGame]);
 
   const myColor = useMemo(() => {
-    if (!onlineGame || !me) return null;
-    if (onlineGame.white_player_id === me.id) return 'w';
-    if (onlineGame.black_player_id === me.id) return 'b';
+    if (!onlineGame || !identity?.id) return null;
+    if (onlineGame.white_player_id === identity.id) return 'w';
+    if (onlineGame.black_player_id === identity.id) return 'b';
     return null;
-  }, [onlineGame, me]);
+  }, [onlineGame, identity?.id]);
 
   const state = mode === 'online' ? onlineDerived?.state : localState;
   const captured =
@@ -461,17 +496,6 @@ export default function Home() {
   }
 
   // --- online operations -------------------------------------------------
-  async function ensureUser() {
-    if (me) return me;
-    try {
-      const u = await base44.auth.me();
-      setMe(u);
-      return u;
-    } catch {
-      return null;
-    }
-  }
-
   // Online play is a Pro feature. Free users are prompted to upgrade (web) or
   // see a locked message (mobile, where Pro can't be purchased).
   function requirePro() {
@@ -484,18 +508,13 @@ export default function Home() {
   async function createOnline() {
     setOnlineError('');
     try {
-      const user = await ensureUser();
-      if (!user) {
-        setOnlineError('Sign in to play online.');
-        return;
-      }
       if (!requirePro()) return;
       const code = generateCode();
       const rec = await base44.entities.Game.create({
         code,
         status: 'waiting',
         host_color: 'w',
-        white_player_id: user.id,
+        white_player_id: identity.id,
         black_player_id: null,
         moves: [],
         result: null,
@@ -511,11 +530,6 @@ export default function Home() {
   async function joinOnline(code) {
     setOnlineError('');
     try {
-      const user = await ensureUser();
-      if (!user) {
-        setOnlineError('Sign in to play online.');
-        return;
-      }
       if (!requirePro()) return;
       const found = await base44.entities.Game.filter({
         code: code.toUpperCase(),
@@ -526,14 +540,14 @@ export default function Home() {
         return;
       }
       const g = found[0];
-      if (g.white_player_id === user.id) {
+      if (g.white_player_id === identity.id) {
         setOnlineError('That is your own game — waiting for an opponent.');
         prevMovesLen.current = g.moves?.length || 0;
         setOnlineGame(g);
         return;
       }
       const updated = await base44.entities.Game.update(g.id, {
-        black_player_id: user.id,
+        black_player_id: identity.id,
         status: 'active',
         last_move_at: new Date().toISOString(),
       });
@@ -577,7 +591,7 @@ export default function Home() {
         } catch {
           // ignore
         }
-      } else if (onlineGame.status === 'waiting' && onlineGame.white_player_id === me?.id) {
+      } else if (onlineGame.status === 'waiting' && onlineGame.white_player_id === identity?.id) {
         try {
           await base44.entities.Game.delete(onlineGame.id);
         } catch {
@@ -689,20 +703,15 @@ export default function Home() {
 
   async function quickMatch() {
     setOnlineError('');
-    const user = await ensureUser();
-    if (!user) {
-      setOnlineError('Sign in to play online.');
-      return;
-    }
     if (!requirePro()) return;
     try {
       const open = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
       const joinable = (open || []).find(
-        (g) => g.white_player_id !== user.id && !g.black_player_id
+        (g) => g.white_player_id !== identity.id && !g.black_player_id
       );
       if (joinable) {
         const updated = await base44.entities.Game.update(joinable.id, {
-          black_player_id: user.id,
+          black_player_id: identity.id,
           status: 'active',
           last_move_at: new Date().toISOString(),
         });
@@ -718,18 +727,13 @@ export default function Home() {
 
   async function joinSpecific(game) {
     setOnlineError('');
-    const user = await ensureUser();
-    if (!user) {
-      setOnlineError('Sign in to play online.');
-      return;
-    }
-    if (game.white_player_id === user.id) {
+    if (game.white_player_id === identity.id) {
       setOnlineError('That is your own game.');
       return;
     }
     try {
       const updated = await base44.entities.Game.update(game.id, {
-        black_player_id: user.id,
+        black_player_id: identity.id,
         status: 'active',
         last_move_at: new Date().toISOString(),
       });
@@ -757,11 +761,6 @@ export default function Home() {
 
   async function startGhost() {
     setOnlineError('');
-    const user = await ensureUser();
-    if (!user) {
-      setOnlineError('Sign in to play online.');
-      return;
-    }
     if (!requirePro()) return;
     try {
       const code = generateCode();
@@ -769,7 +768,7 @@ export default function Home() {
         code,
         status: 'active',
         host_color: 'w',
-        white_player_id: user.id,
+        white_player_id: identity.id,
         black_player_id: '__ghost__',
         moves: [],
         result: null,
@@ -1312,6 +1311,17 @@ export default function Home() {
           </div>
 
           <aside className="space-y-5">
+            {me && !identity.player_name && (
+              <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
+            )}
+            {mode === 'online' && (
+              <LobbyPanel
+                online={online}
+                openGames={openGames}
+                myIdentityId={identity.id}
+                onJoinGame={joinSpecific}
+              />
+            )}
             {/* Game controls (all modes) */}
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -1398,7 +1408,7 @@ export default function Home() {
               <OnlinePanel
                 onlineGame={onlineGame}
                 myColor={myColor}
-                myId={me?.id}
+                myId={identity.id}
                 openGames={openGames}
                 activeGames={activeGames}
                 spectator={spectator}
@@ -1421,7 +1431,7 @@ export default function Home() {
             {!(mode === 'online' && onlineGame && onlineGame.status === 'active') && (
               <SpectatePanel
                 activeGames={activeGames}
-                myId={me?.id}
+                myId={identity.id}
                 onWatch={watchGame}
                 onRefresh={refreshOpenGames}
               />

@@ -21,6 +21,10 @@
       "type": "number",
       "description": "Completed games by this user.",
       "default": 0
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Display name shown in the lobby and games; empty falls back to 'Anonymous'."
     }
   },
   "required": [
