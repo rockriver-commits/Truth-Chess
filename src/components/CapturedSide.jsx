@@ -1,6 +1,20 @@
 import React from 'react';
 
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
+const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
+
+// Mini cross matching the Truth piece used on the board, so a captured Truth
+// isn't mistaken for a king.
+function TruthGlyph({ color }) {
+  const stroke = color === 'w' ? '#e2e8f0' : '#1f2937';
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" style={{ display: 'inline-block', verticalAlign: '-0.15em' }} aria-label="Truth">
+      <polygon points="5,23 19,23 12,15" fill={stroke} />
+      <rect x="10" y="0" width="4" height="23" rx="1.5" fill={stroke} />
+      <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={stroke} />
+      <circle cx="12" cy="8.5" r="2.6" fill="#facc15" />
+    </svg>
+  );
+}
 
 // Compact captured-pieces card shown to the right of the board. Stacks one
 // per side (White captured, Black captured) so the totals sit beside the
@@ -23,7 +37,7 @@ export default function CapturedSide({ pieces, label }) {
                 textShadow: p.color === 'w' ? '0 0 1px rgba(0,0,0,0.6)' : 'none',
               }}
             >
-              {GLYPHS[p.type]}
+              {p.type === 'T' ? <TruthGlyph color={p.color} /> : GLYPHS[p.type]}
             </span>
           ))
         )}
