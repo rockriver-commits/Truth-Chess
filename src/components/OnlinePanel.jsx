@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ChatPanel from '@/components/ChatPanel';
 
-// Online lobby + matchmaking + in-game status + spectating + chat. The board
-// and move handling live in Home; this panel handles Quick Match, the live
-// open-games lobby, private host/join-by-code, spectating active games, the
-// waiting room, resign/leave, and the in-game chat.
+// Online lobby, streamlined around a single "Play Online" action that finds an
+// open game or starts a new one. Private host/join-by-code is kept as an
+// optional expandable section for players who want to invite a specific
+// friend — but it's no longer the default path.
 export default function OnlinePanel({
   onlineGame,
   myColor,
@@ -30,111 +30,63 @@ export default function OnlinePanel({
   onDeclineDraw,
 }) {
   const [code, setCode] = useState('');
+  const [showPrivate, setShowPrivate] = useState(false);
 
+  // ---- No game yet: matchmaking lobby ------------------------------------
   if (!onlineGame) {
-    const games = openGames || [];
     return (
       <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 space-y-5">
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <p className="text-xs uppercase tracking-widest text-stone-400">Play online</p>
           {!myId ? (
             <div className="space-y-2">
-              <p className="text-sm text-stone-500">You need an account to play online.</p>
+              <p className="text-sm text-stone-500">Create a free account to play online.</p>
               <div className="grid grid-cols-2 gap-2">
-                <Link to="/login"><Button className="w-full">Sign in</Button></Link>
-                <Link to="/register"><Button variant="outline" className="w-full">Register</Button></Link>
+                <Link to="/register"><Button className="w-full">Register</Button></Link>
+                <Link to="/login"><Button variant="outline" className="w-full">Sign in</Button></Link>
               </div>
             </div>
           ) : (
             <>
-              <Button onClick={onQuickMatch} className="w-full">Quick Match</Button>
-              <p className="text-[0.7rem] text-stone-400">
-                Join an open game, or start a new one if none are waiting.
+              <Button onClick={onQuickMatch} className="w-full h-11 text-base">
+                Play Online
+              </Button>
+              <p className="text-[0.7rem] text-stone-400 text-center">
+                We'll match you with an available opponent, or start a new game
+                if none are waiting.
               </p>
             </>
           )}
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Open games</p>
-          {games.length === 0 ? (
-            <p className="text-sm text-stone-400">
-              No open games right now. Tap Quick Match to start one.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {games.map((g) => {
-                const mine = g.white_player_id === myId;
-                return (
-                  <div
-                    key={g.id}
-                    className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
-                  >
-                    <span className="font-mono text-sm tracking-widest text-stone-700">
-                      {g.code}
-                      {mine && (
-                        <span className="ml-2 text-[0.6rem] uppercase tracking-wider text-amber-600">
-                          your game
-                        </span>
-                      )}
-                    </span>
-                    {mine ? (
-                      <Button size="sm" variant="outline" onClick={() => onReenterOwn(g)}>
-                        Open
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => onJoinGame(g)}>Join</Button>
-                    )}
-                  </div>
-                );
-              })}
+        {/* Optional private-game path, collapsed by default */}
+        <div className="border-t border-stone-100 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowPrivate((s) => !s)}
+            className="w-full text-left text-[0.7rem] uppercase tracking-widest text-stone-400 hover:text-stone-600 transition"
+          >
+            {showPrivate ? '▾' : '▸'} Play a private game with a code
+          </button>
+          {showPrivate && (
+            <div className="mt-3 space-y-3">
+              <Button onClick={onCreate} variant="outline" className="w-full">
+                Create a private game
+              </Button>
+              <div className="flex gap-2">
+                <Input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="CODE"
+                  maxLength={5}
+                  className="uppercase tracking-widest font-mono"
+                />
+                <Button onClick={() => onJoinCode(code.trim())} disabled={code.trim().length < 4}>
+                  Join
+                </Button>
+              </div>
             </div>
           )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="h-px bg-stone-200 flex-1" />
-          <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">or private</span>
-          <div className="h-px bg-stone-200 flex-1" />
-        </div>
-
-        <div>
-          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Host with a code</p>
-          <Button onClick={onCreate} variant="outline" className="w-full">
-            Create a new game
-          </Button>
-        </div>
-
-        <div>
-          <p className="text-xs uppercase tracking-widest text-stone-400 mb-2">Join with a code</p>
-          <div className="flex gap-2">
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="CODE"
-              maxLength={5}
-              className="uppercase tracking-widest font-mono"
-            />
-            <Button onClick={() => onJoinCode(code.trim())} disabled={code.trim().length < 4}>
-              Join
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="h-px bg-stone-200 flex-1" />
-          <span className="text-[0.65rem] uppercase tracking-widest text-stone-400">test</span>
-          <div className="h-px bg-stone-200 flex-1" />
-        </div>
-
-        <div className="space-y-1.5">
-          <p className="text-xs uppercase tracking-widest text-stone-400">Test online sync</p>
-          <Button onClick={onStartGhost} variant="outline" className="w-full">
-            Play vs AI (ghost)
-          </Button>
-          <p className="text-[0.7rem] text-stone-400">
-            The AI plays the opponent over the live channel — no second account needed.
-          </p>
         </div>
 
         {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
@@ -142,20 +94,22 @@ export default function OnlinePanel({
     );
   }
 
+  // ---- Waiting room (player created a game, no opponent yet) --------------
   if (onlineGame.status === 'waiting') {
     return (
       <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 text-center space-y-3">
-        <p className="text-xs uppercase tracking-widest text-stone-400">Share this code</p>
-        <p className="text-4xl font-display font-semibold tracking-[0.2em] text-stone-800">
-          {onlineGame.code}
+        <div className="w-8 h-8 mx-auto border-4 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
+        <p className="text-sm font-medium text-stone-700">Finding an opponent…</p>
+        <p className="text-[0.7rem] text-stone-400">
+          Or share this code for a friend: <span className="font-mono tracking-widest text-stone-600">{onlineGame.code}</span>
         </p>
-        <p className="text-sm text-stone-500">{statusText}</p>
         <Button onClick={onLeave} variant="outline" className="w-full">Cancel</Button>
         {onlineError && <p className="text-sm text-rose-600">{onlineError}</p>}
       </div>
     );
   }
 
+  // ---- Active / finished game -------------------------------------------
   const youAre = spectator ? 'Spectator' : myColor === 'w' ? 'White' : 'Black';
   return (
     <div className="space-y-4">
@@ -167,7 +121,6 @@ export default function OnlinePanel({
           </div>
           <span className="text-xs text-stone-400">You: {youAre}</span>
         </div>
-        <p className="text-[0.65rem] uppercase tracking-widest text-stone-400">Code: {onlineGame.code}</p>
         {onlineGame.status === 'active' && !spectator && (
           onlineGame.draw_offer_by && onlineGame.draw_offer_by !== myColor ? (
             <div className="grid grid-cols-2 gap-2">
