@@ -173,6 +173,208 @@ export default function TruthGuide() {
         <strong>Is en passant allowed?</strong> Yes — all standard chess special moves apply, including
         en passant, castling, and promotion.
       </p>
+
+      <H2>Inside the engine — meet Veritas</H2>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        The AI you play against is <strong>Veritas</strong>, an engine written from scratch for the
+        Truth Chess board and rules. Veritas is not a port of an 8×8 engine with the board stretched —
+        its move generator, evaluation, and learning were all built for the 10×9 geometry and the Truth
+        piece. It runs entirely in your browser, so it never calls a paid server and never sends your
+        position anywhere. Every move you see is computed live on your device.
+      </p>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">How Veritas thinks</h3>
+      <p className="mt-2 text-stone-600 leading-relaxed">
+        At its core Veritas uses <strong>iterative-deepening negamax search with alpha-beta pruning</strong> —
+        the same family of algorithm that powers nearly every strong chess engine, but adapted here for
+        Truth Chess. It searches deeper and deeper one ply at a time, and because each completed depth
+        produces a best move, it can always fall back to the last good answer if it runs out of time.
+        On top of that backbone it layers the classic optimizations that make a search practical:
+      </p>
+      <ul className="mt-3 space-y-2 text-stone-600 leading-relaxed list-disc pl-5">
+        <li>
+          <strong>A transposition table with Zobrist hashing.</strong> Every position is hashed, so if
+          the search reaches the same arrangement by a different move order it reuses the earlier result
+          instead of re-searching. This alone can double or triple effective depth.
+        </li>
+        <li>
+          <strong>Quiescence search.</strong> At the bottom of the tree Veritas keeps searching only
+          captures, promotions, and checks until the position is "quiet" — so it never stops mid-trade
+          and misjudges a position that still has a hanging piece. This is the single biggest reason
+          the engine doesn't blunder material.
+        </li>
+        <li>
+          <strong>Move ordering.</strong> Captures are tried first using MVV-LVA (most valuable victim,
+          least valuable attacker), then the transposition-table move, then <em>killer moves</em> (quiet
+          moves that caused cutoffs in sibling nodes) and a <em>history table</em> of quiet moves that
+          have done well. Good ordering is what lets alpha-beta prune aggressively.
+        </li>
+        <li>
+          <strong>Null-move pruning.</strong> When not in check and with material to spare, Veritas can
+          "pass" a turn at reduced depth; if the opponent still can't beat the current best, the whole
+          line is pruned. It skips this in bare king-and-pawn endings to avoid zugzwang mistakes.
+        </li>
+        <li>
+          <strong>Late-move reductions and check extensions.</strong> Quiet moves searched late get a
+          shallower look (with a full re-search if they surprisingly look good), while checking moves
+          get an extra ply so forcing mates are found inside the depth budget.
+        </li>
+      </ul>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        Hard limits keep the browser responsive: a node cap and a wall-clock deadline stop any search
+        before it can freeze the page, so even a deep quiescence can never stall the UI.
+      </p>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">Evaluation built for Truth Chess</h3>
+      <p className="mt-2 text-stone-600 leading-relaxed">
+        Veritas scores a position with far more than material. Its evaluation function was written
+        specifically around the Truth piece and the wider board:
+      </p>
+      <ul className="mt-3 space-y-2 text-stone-600 leading-relaxed list-disc pl-5">
+        <li>
+          <strong>Game-phase awareness.</strong> A middlegame king-safety term penalizes an exposed king
+          and rewards a pawn shield, then fades smoothly into an endgame term that instead centralizes
+          the king and drives the enemy king toward the edge and corner to deliver mate.
+        </li>
+        <li>
+          <strong>Truth hunt.</strong> Because a Truth can only be captured by the enemy king, Veritas
+          is rewarded for maneuvering its own king toward the opponent's Truth pieces — the signature
+          endgame mechanic of Truth Chess. The closer the king gets, the higher the score.
+        </li>
+        <li>
+          <strong>Truth blockade.</strong> The opening and middlegame reward a Truth planted in front of
+          enemy pieces or deep in enemy territory, since it denies squares that almost nothing can
+          remove. A Truth that cramps the opponent's development is worth points even when it captures
+          nothing.
+        </li>
+        <li>
+          <strong>Contempt and the mating drive.</strong> The side with a material lead is rewarded for
+          keeping its queens and rooks, so it retains the firepower to force mate instead of trading down
+          to a lifeless draw. This contempt term is scaled by what the engine has learned about
+          aggression from its own games.
+        </li>
+        <li>
+          <strong>Hanging-piece and hanging-check safety.</strong> Veritas detects pieces attacked by
+          weaker enemies and penalizes giving them up for free — and it specifically punishes a "hanging
+          check," where a piece checks the enemy king but is undefended and close enough for the king to
+          simply capture it. The engine won't hand pieces to the king unless it is far enough ahead that
+          the sacrifice is clearly winning.
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">An engine that learns from its own games</h3>
+      <p className="mt-2 text-stone-600 leading-relaxed">
+        Unlike a fixed-strength engine, Veritas improves over time through several self-learning
+        mechanisms, all stored locally on your device (and, where it helps, shared through the
+        server-backed mate book):
+      </p>
+      <ul className="mt-3 space-y-2 text-stone-600 leading-relaxed list-disc pl-5">
+        <li>
+          <strong>Self-play position memory.</strong> Every AI-driven game records each position, the
+          move chosen, and the outcome. Moves that have historically won are promoted to the front of
+          the search (and re-verified, not blindly trusted), so Veritas spends its thinking time on
+          lines that have actually paid off.
+        </li>
+        <li>
+          <strong>Persistent best-move hints.</strong> The engine remembers its last chosen move for
+          each position and seeds the search ordering from it — reaching trusted lines faster, the way
+          a transposition-table entry would.
+        </li>
+        <li>
+          <strong>Tunable evaluation weights.</strong> After each self-play game, weights for
+          king-safety, contempt, the Truth hunt, center control, and passed pawns nudge toward the side
+          that won (bounded so no single term can run away). This is a lightweight form of the
+          Texel-style tuning used by competitive engines.
+        </li>
+        <li>
+          <strong>A shared mate book with mirror symmetry.</strong> When Veritas finds a checkmate, it
+          records the winning line. On the next game it recognizes known mates instantly — and it tries
+          the mirrored wing of the board too, so a mate learned on the queenside is available on the
+          kingside without re-solving it.
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">Effectiveness</h3>
+      <p className="mt-2 text-stone-600 leading-relaxed">
+        Veritas plays strong, consistent chess at all ten difficulty levels. There is no "easy mode"
+        that throws in random blunders — every level uses the full search and quiescence, with higher
+        levels simply searching deeper and longer. Because it searches with alpha-beta, a transposition
+        table, and quiescence, it reliably avoids one-move blunders and finds short forced mates. The
+        Truth-specific terms mean it understands the variant's distinctive ideas — blockading with the
+        Truth, hunting the enemy Truth with the king, and keeping major pieces alive to convert a lead —
+        rather than treating the new piece as a generic queen. For a casual or intermediate player,
+        Veritas at the upper levels is a genuine challenge; for a strong player it provides a solid
+        sparring partner that gets sharper the more games are played.
+      </p>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">Limitations</h3>
+      <ul className="mt-3 space-y-2 text-stone-600 leading-relaxed list-disc pl-5">
+        <li>
+          <strong>Search depth is browser-bound.</strong> Veritas runs on your device under a hard time
+          budget, so it can't match the depth of a server engine running on dozens of cores for minutes.
+          Its strength comes from efficient pruning and variant-aware evaluation, not from raw depth.
+        </li>
+        <li>
+          <strong>No opening book or endgame tablebase in the traditional sense.</strong> Veritas uses a
+          light opening target system and its own learned mate book, but it does not ship the huge
+          opening books or seven-piece tablebases that standard engines rely on. Truly novel positions
+          are solved by search, not looked up.
+        </li>
+        <li>
+          <strong>Self-learning is local and gradual.</strong> The tuned weights and learned positions
+          improve with play, but the signal is statistical and accumulates over many games. It is not
+          trained offline on millions of self-play games the way a modern neural-network engine is.
+        </li>
+        <li>
+          <strong>Evaluation is hand-crafted, not neural.</strong> Veritas uses a hand-written
+          evaluation function tuned for Truth Chess, not a deep neural network. That makes it fast and
+          transparent, but it can miss the long-horizon, pattern-based judgments a neural net would
+          catch — especially in quiet positional positions the Truth's blockade makes unusual.
+        </li>
+      </ul>
+
+      <h3 className="mt-5 text-base font-semibold text-stone-700">How Veritas differs from Stockfish and other 8×8 engines</h3>
+      <p className="mt-2 text-stone-600 leading-relaxed">
+        The engines most players know — <strong>Stockfish</strong>, Leela Chess Zero, Komodo, and the
+        classic craft — were all built for the standard 8×8 board. Veritas is not one of them adapted
+        to a bigger board; it is a different engine for a different game. The differences go well beyond
+        board size:
+      </p>
+      <ul className="mt-3 space-y-2 text-stone-600 leading-relaxed list-disc pl-5">
+        <li>
+          <strong>Different geometry.</strong> Standard engines hard-code the 64-square board into their
+          move generation, attack maps, and indexing. Veritas generates moves for a 90-square, 10×9 grid
+          from the ground up, including the wider castling and the longer back rank.
+        </li>
+        <li>
+          <strong>A piece no 8×8 engine knows about.</strong> The Truth has no analogue in standard
+          chess, so Stockfish's evaluation has no concept of it. Veritas dedicates whole evaluation
+          terms to the Truth — its role as an uncapturable blocker, the king-driven Truth hunt, and the
+          special capture rules — that an 8×8 engine simply cannot express.
+        </li>
+        <li>
+          <strong>Different opening phase.</strong> On the 10×9 board the armies start three empty ranks
+          apart instead of two, so the opening is more about maneuvering than immediate contact. Veritas
+          uses a light opening target system tuned to this longer development distance, rather than the
+          book-driven opening play of standard engines.
+        </li>
+        <li>
+          <strong>No inherited theory.</strong> Stockfish benefits from decades of human opening
+          theory and endgame tablebases for 8×8 chess — none of which transfer to a 10×9 board with a
+          new piece. Veritas must build its own understanding through search and self-play.
+        </li>
+        <li>
+          <strong>Runs entirely in the browser.</strong> Stockfish is a compiled native binary
+          (often running server-side on powerful hardware). Veritas is pure JavaScript running on your
+          device, so it has no install, no server cost, and no network dependency — at the cost of raw
+          computing power.
+        </li>
+      </ul>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        In short, where Stockfish is a mature, deeply-tuned specialist for traditional chess, Veritas is
+        a young, variant-native engine: smaller and lighter, but purpose-built for the 10×9 board and
+        the Truth piece, and able to grow stronger the more games are played on it.
+      </p>
     </section>
   );
 }
