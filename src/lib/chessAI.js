@@ -452,6 +452,8 @@ function orderMoves(moves, ply = 0, ttMove = null) {
 // --- Search state (module-level; one search at a time) --------------------
 let deadline = 0;
 let timedOut = false;
+let nodeCount = 0;
+const MAX_NODES = 500000; // hard cap so a heavy quiescence can never freeze the tab
 let useQuiescence = true;
 let aggressive = false;
 let curAggressionMul = 1; // adaptive contempt scaling (from self-play learning)
@@ -462,6 +464,11 @@ const FLAG = { EXACT: 0, LOWER: 1, UPPER: 2 };
 const now = () => performance.now();
 
 function quiesce(state, color, alpha, beta, qsPly = 0) {
+  // Check the budget BEFORE the expensive allLegalMoves call — otherwise a
+  // deep capture line can blow far past the deadline and freeze the UI long
+  // enough that the computer appears to stop moving.
+  if (now() > deadline || ++nodeCount > MAX_NODES) { timedOut = true; return alpha; }
+  if (qsPly > 12) return alpha;
   const opp = color === 'w' ? 'b' : 'w';
   const checked = inCheck(state, color);
   const all = allLegalMoves(state, color);
@@ -506,7 +513,7 @@ function hasNonPawnMaterial(state, color) {
 }
 
 function negamax(state, color, depth, alpha, beta, ply) {
-  if (now() > deadline) { timedOut = true; return alpha; }
+  if (now() > deadline || ++nodeCount > MAX_NODES) { timedOut = true; return alpha; }
   const key = hashState(state.board, state.turn);
   const tt = TT.get(key);
   let ttMove = null;
@@ -605,6 +612,7 @@ function isDrawingMove(state, move, positionKeys) {
 // Prefer the chosen move; if it draws, pick the first (best-ordered)
 // alternative that doesn't. If every move draws, play the chosen one.
 function pickNonDrawing(state, preferred, ordered, positionKeys) {
+  if (!preferred) return ordered[0];
   if (!isDrawingMove(state, preferred, positionKeys)) return preferred;
   const alt = ordered.find((m) => !isDrawingMove(state, m, positionKeys));
   return alt || preferred;
@@ -621,6 +629,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       : null;
   deadline = now() + cfg.timeMs;
   timedOut = false;
+  nodeCount = 0;
   TT.clear();
   killers = Array.from({ length: MAX_PLY + 8 }, () => [null, null]);
   historyTab = new Int32Array(FILES * RANKS * FILES * RANKS);
@@ -667,10 +676,14 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       if (sc > curBestScore) { curBestScore = sc; curBest = m; }
       if (curBestScore > alpha) alpha = curBestScore;
     }
-    if (!timedOut || d === 1) { best = curBest; bestScore = curBestScore; }
+    // Only adopt this depth's result if a root move actually completed — a
+    // heavy quiescence can time out before any score is produced, leaving
+    // curBest null; in that case keep the previous depth's best (or the
+    // top-ordered move) so the engine always returns a legal move.
+    if (curBest && (!timedOut || d === 1)) { best = curBest; bestScore = curBestScore; }
     if (curBest) ordered = [curBest, ...ordered.filter((m) => m !== curBest)];
     if (timedOut) break;
     if (Math.abs(bestScore) > MATE - 1000) break;
   }
-  return pickNonDrawing(state, best, ordered, pkeys);
+  return pickNonDrawing(state, best || ordered[0], ordered, pkeys);
 }
