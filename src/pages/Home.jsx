@@ -1183,7 +1183,7 @@ export default function Home() {
                 />
               </div>
             )}
-            <div className="w-full flex justify-center gap-3">
+            <div className="w-full flex justify-center gap-2">
               <div className="flex flex-col self-stretch mt-3 gap-2">
                 <nav
                   className="flex flex-col gap-2.5 p-2.5 bg-stone-100 rounded-2xl shadow-inner"
@@ -1263,7 +1263,7 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col items-center min-w-0 flex-1">
+              <div className="flex flex-col items-center w-full max-w-[600px]">
                 {state ? (
                   !spectator ? (
                     <div className="my-3 w-full flex justify-center">{boardEl}</div>
