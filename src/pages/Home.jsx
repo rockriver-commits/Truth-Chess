@@ -1077,7 +1077,7 @@ export default function Home() {
   // The board itself, shared between the in-flow (player) layout and the
   // sticky (spectator) layout so the ChessBoard props stay in one place.
   const boardEl = (
-    <div className="relative w-full max-w-[900px]">
+    <div className="relative w-full" style={{ maxWidth: 'min(820px, calc((100vh - 310px) * 10 / 9))' }}>
       <ChessBoard
         board={viewState.board}
         selected={reviewing ? null : selected}
@@ -1366,7 +1366,7 @@ export default function Home() {
             )}
 
             {mode !== 'online' && (
-              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5">
+              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
                 <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
                 <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                   <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
