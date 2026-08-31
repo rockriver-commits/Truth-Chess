@@ -33,7 +33,6 @@ import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
 import EmailListPanel from '@/components/EmailListPanel';
-import RegisterToPlayCard from '@/components/RegisterToPlayCard';
 import { loadAdSense } from '@/lib/adsense';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
@@ -119,7 +118,6 @@ export default function Home() {
 
   // online
   const [me, setMe] = useState(null);
-  const [meLoaded, setMeLoaded] = useState(false);
   const [onlineGame, setOnlineGame] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
@@ -130,8 +128,8 @@ export default function Home() {
 
   useEffect(() => {
     base44.auth.me()
-      .then((u) => { setMe(u); setMeLoaded(true); })
-      .catch(() => { setMe(null); setMeLoaded(true); });
+      .then((u) => { setMe(u); })
+      .catch(() => { setMe(null); });
   }, []);
 
   // Load the shared, server-backed mate book so the AI recalls checkmates
@@ -1112,13 +1110,6 @@ export default function Home() {
           </div>
         </header>
 
-        {!meLoaded ? (
-          <div className="flex justify-center py-24">
-            <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
-          </div>
-        ) : !me ? (
-          <RegisterToPlayCard />
-        ) : (
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
             <div className="w-full max-w-[620px] mb-3 space-y-2">
@@ -1391,7 +1382,6 @@ export default function Home() {
             )}
           </aside>
         </div>
-        )}
 
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
