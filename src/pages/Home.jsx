@@ -113,6 +113,7 @@ export default function Home() {
   // localMoves.length, so it stays aligned with actual play.
   const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
   const recordedRef = useRef(false);
+  const dailyStatRef = useRef(false);
   const kingOnlySinceRef = useRef(null);
   const computerGameRef = useRef(null);
   const computerBroadcastRef = useRef({ queue: [], gameOver: false, status: 'playing', turn: 'w', processing: false });
@@ -1314,6 +1315,21 @@ export default function Home() {
       recordGameResult(positionList, result);
     }
   }, [mode, gameOver, status, threefold, drawAgreed, resigned, timedOut, ghostOpponent, cvcResignResult, positionList, localMoves.length, turn]);
+
+  // Daily games-played counter: record exactly one count per game, in every
+  // mode, when it ends. Spectators don't count; online games are recorded by
+  // White's client only so a two-player online game isn't double-counted.
+  useEffect(() => {
+    const finished = gameOver || (mode === 'online' && onlineGame?.status === 'finished');
+    if (!finished) { dailyStatRef.current = false; return; }
+    if (dailyStatRef.current) return;
+    if (mode === 'online' && spectator) return;
+    if (mode === 'online' && myColor !== 'w') return;
+    dailyStatRef.current = true;
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    base44.functions.invoke('record-game-played', { date }).catch(() => {});
+  }, [gameOver, mode, onlineGame?.status, spectator, myColor]);
 
   function advance() {
     setDifficulty((d) => Math.min(10, d + 1));
