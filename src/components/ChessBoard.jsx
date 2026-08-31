@@ -12,7 +12,7 @@ function Cross({ color }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="w-[60%] h-[60%]"
+      className="w-[85%] h-[85%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
       <polygon points="5,23 19,23 12,15" fill={fill} stroke={stroke} strokeWidth="0.6" strokeLinejoin="round" />
