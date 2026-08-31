@@ -737,6 +737,7 @@ export default function Home() {
         last_move_at: new Date().toISOString(),
       });
       prevMovesLen.current = 0;
+      setMode('online');
       setOnlineGame(updated);
     } catch (e) {
       setOnlineError('Could not join that game.');
@@ -1313,14 +1314,12 @@ export default function Home() {
             {me && !identity.player_name && (
               <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
             )}
-            {mode === 'online' && (
-              <LobbyPanel
-                online={online}
-                openGames={openGames}
-                myIdentityId={identity.id}
-                onJoinGame={joinSpecific}
-              />
-            )}
+            <LobbyPanel
+              online={online}
+              openGames={openGames}
+              myIdentityId={identity.id}
+              onJoinGame={joinSpecific}
+            />
             {/* Game controls (all modes) */}
             <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
