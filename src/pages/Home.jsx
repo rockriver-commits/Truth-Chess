@@ -379,6 +379,10 @@ export default function Home() {
   }
 
   function offerDraw() {
+    if (mode === 'online') {
+      offerDrawOnline();
+      return;
+    }
     if ((mode !== 'local' && mode !== 'computer') || gameOver) return;
     setDrawAgreed(true);
     playSound('mate');
@@ -434,6 +438,16 @@ export default function Home() {
   function guardedChangeMode(m) {
     if (MODES.find((x) => x.key === m)?.pro && !hasAccess) {
       if (canUpgrade) setShowPro(true);
+      return;
+    }
+    if (m === 'online') {
+      // Already in an active game — no need to re-matchmake.
+      if (mode === 'online' && onlineGame?.status === 'active') return;
+      leaveOnline();
+      setMode('online');
+      resetLocal();
+      // Go straight into matchmaking so the board appears immediately.
+      quickMatch();
       return;
     }
     changeMode(m);
@@ -1177,23 +1191,21 @@ export default function Home() {
                   ))}
                 </nav>
                 <div className="flex flex-col gap-1.5 mt-auto mb-8">
-                  {mode !== 'online' && (
-                    <div className="flex flex-col gap-1">
-                      <p className="text-[0.6rem] uppercase tracking-widest text-stone-400 px-1">Time Control</p>
-                      <select
-                        value={timeControl}
-                        onChange={(e) => setTimeControl(e.target.value)}
-                        className="h-8 px-2 text-xs rounded-lg border border-stone-300 bg-white/90 backdrop-blur text-stone-700"
-                      >
-                        {Object.keys(TIME_CONTROLS).map((k) => (
-                          <option key={k} value={k}>
-                            {TIME_CONTROLS[k].label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {(mode === 'local' || mode === 'computer') && !gameOver && (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[0.6rem] uppercase tracking-widest text-stone-400 px-1">Time Control</p>
+                    <select
+                      value={timeControl}
+                      onChange={(e) => setTimeControl(e.target.value)}
+                      className="h-8 px-2 text-xs rounded-lg border border-stone-300 bg-white/90 backdrop-blur text-stone-700"
+                    >
+                      {Object.keys(TIME_CONTROLS).map((k) => (
+                        <option key={k} value={k}>
+                          {TIME_CONTROLS[k].label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame?.status === 'active' && !spectator && myColor)) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1203,7 +1215,7 @@ export default function Home() {
                       Draw
                     </Button>
                   )}
-                  {(mode === 'local' || mode === 'computer') && !gameOver && (
+                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame?.status === 'active' && !spectator && myColor)) && (
                     <Button
                       size="sm"
                       variant="outline"
