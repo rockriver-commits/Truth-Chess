@@ -51,7 +51,7 @@ const MODES = [
 ];
 
 const TIME_CONTROLS = {
-  unlimited: { label: 'Unlimited', initial: null, inc: 0 },
+  '30+0': { label: '30 min', initial: 1800, inc: 0 },
   '3+2': { label: '3+2 Blitz', initial: 180, inc: 2 },
   '5+0': { label: '5+0 Bullet', initial: 300, inc: 0 },
   '10+0': { label: '10+0 Rapid', initial: 600, inc: 0 },
@@ -108,9 +108,9 @@ export default function Home() {
   const [localMoves, setLocalMoves] = useState([]);
   const [drawAgreed, setDrawAgreed] = useState(false);
   const [reviewIdx, setReviewIdx] = useState(null);
-  const [timeControl, setTimeControl] = useState('unlimited');
-  const [whiteClock, setWhiteClock] = useState(null);
-  const [blackClock, setBlackClock] = useState(null);
+  const [timeControl, setTimeControl] = useState('30+0');
+  const [whiteClock, setWhiteClock] = useState(TIME_CONTROLS['30+0'].initial);
+  const [blackClock, setBlackClock] = useState(TIME_CONTROLS['30+0'].initial);
   const [timedOut, setTimedOut] = useState(null);
   const [animateMove, setAnimateMove] = useState(null);
   const [showPro, setShowPro] = useState(false);
@@ -376,7 +376,7 @@ export default function Home() {
     if (move.captured) {
       setLocalCaptured((c) => ({ ...c, [localState.turn]: [...c[localState.turn], move.captured] }));
     }
-    if (timeControl !== 'unlimited') {
+    if (timeControl !== '30+0') {
       const inc = TIME_CONTROLS[timeControl].inc;
       if (localState.turn === 'w') setWhiteClock((c) => (c ?? 0) + inc);
       else setBlackClock((c) => (c ?? 0) + inc);
@@ -956,7 +956,7 @@ export default function Home() {
 
   // elapsed count-up (online, or local/computer with unlimited time)
   useEffect(() => {
-    const useElapsed = mode === 'online' || timeControl === 'unlimited';
+    const useElapsed = mode === 'online';
     const active = mode === 'online' ? onlineGame?.status === 'active' && !gameOver : !gameOver;
     if (!useElapsed || !active) return undefined;
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
@@ -966,7 +966,7 @@ export default function Home() {
 
   // per-side countdown clocks (local & computer, timed control)
   useEffect(() => {
-    if (mode === 'online' || gameOver || timeControl === 'unlimited') return undefined;
+    if (mode === 'online' || gameOver) return undefined;
     let last = Date.now();
     const id = setInterval(() => {
       const now = Date.now();
@@ -981,7 +981,7 @@ export default function Home() {
 
   // flag on time out
   useEffect(() => {
-    if (mode === 'online' || gameOver || timeControl === 'unlimited' || timedOut) return;
+    if (mode === 'online' || gameOver || timedOut) return;
     if (whiteClock !== null && whiteClock <= 0) {
       setTimedOut('w');
       playSound('mate');
@@ -1289,7 +1289,7 @@ export default function Home() {
 
         <div className="flex flex-col gap-8">
           <div className="flex flex-col items-center">
-            {state && mode !== 'online' && timeControl !== 'unlimited' && (
+            {state && mode !== 'online' && (
               <div className="w-full max-w-[540px] mb-2">
                 <ClockBar
                   whiteClock={whiteClock}
