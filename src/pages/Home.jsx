@@ -379,7 +379,7 @@ export default function Home() {
   }
 
   function offerDraw() {
-    if (mode !== 'local' || gameOver) return;
+    if ((mode !== 'local' && mode !== 'computer') || gameOver) return;
     setDrawAgreed(true);
     playSound('mate');
   }
@@ -1193,7 +1193,7 @@ export default function Home() {
                       </select>
                     </div>
                   )}
-                  {mode === 'local' && !gameOver && (
+                  {(mode === 'local' || mode === 'computer') && !gameOver && (
                     <Button
                       size="sm"
                       variant="outline"
