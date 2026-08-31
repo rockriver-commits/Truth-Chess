@@ -105,7 +105,8 @@ export default function TruthGuide() {
       <p className="mt-3 text-stone-600 leading-relaxed">
         <strong>En passant</strong> lets a pawn capture an enemy pawn that has just advanced two
         squares, as though it had moved only one — exactly as in standard chess. <strong>Promotion</strong>
-        occurs when a pawn reaches the last rank; you choose a queen, rook, bishop, or knight.
+        occurs when a pawn reaches the last rank; you choose a queen, rook, bishop, knight, or a
+        Truth.
       </p>
 
       <H2>Check, checkmate, and the Truth</H2>

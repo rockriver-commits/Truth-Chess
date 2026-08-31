@@ -38,6 +38,7 @@ import { isMobileApp } from '@/lib/isMobileApp';
 import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
+import ResignFlowBanner from '@/components/ResignFlowBanner';
 import TruthGuide from '@/components/TruthGuide';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
@@ -74,6 +75,25 @@ function fmtTime(s) {
   const m = Math.floor(s / 60);
   const ss = s % 60;
   return `${m}:${String(ss).padStart(2, '0')}`;
+}
+
+// AI vs AI auto-resign trigger: a side with only a king (no other pieces) and
+// the opponent holding at least 2 real (non-pawn) pieces is a lost cause — the
+// lone-king side is the "loser" who will offer to resign so spectators don't
+// watch the 50-move rule grind out.
+function loneKingLoser(state) {
+  let wAll = 0, bAll = 0, wPieces = 0, bPieces = 0;
+  for (let r = 0; r < 9; r++) {
+    for (let f = 0; f < 10; f++) {
+      const p = state.board[r][f];
+      if (!p || p.type === 'K') continue;
+      if (p.color === 'w') { wAll++; if (p.type !== 'P') wPieces++; }
+      else { bAll++; if (p.type !== 'P') bPieces++; }
+    }
+  }
+  if (wAll === 0 && bPieces >= 2) return 'w';
+  if (bAll === 0 && wPieces >= 2) return 'b';
+  return null;
 }
 
 export default function Home() {
@@ -128,6 +148,12 @@ export default function Home() {
   const [showPro, setShowPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [started, setStarted] = useState(false);
+  // AI vs AI agreed resignation: a lone-king side offers to resign and the
+  // opponent accepts, shown to the spectator so they don't sit through a dead
+  // 50-move grind. `autoResign` drives the visible offer→accept flow;
+  // `cvcResignResult` ends the game.
+  const [autoResign, setAutoResign] = useState(null);
+  const [cvcResignResult, setCvcResignResult] = useState(null);
 
   // online
   const [me, setMe] = useState(null);
@@ -247,7 +273,7 @@ export default function Home() {
     return hasThreefold(localMoves);
   }, [mode, onlineGame, localMoves]);
 
-  const localOver = mode !== 'online' && (resigned || drawAgreed || !!timedOut);
+  const localOver = mode !== 'online' && (resigned || drawAgreed || !!timedOut || !!cvcResignResult);
   const gameOver =
     status === 'checkmate' ||
     status === 'stalemate' ||
@@ -303,6 +329,7 @@ export default function Home() {
         ? '0-1'
         : '1/2-1/2';
     }
+    if (cvcResignResult) return cvcResignResult === 'white_resigns' ? '0-1' : '1-0';
     if (timedOut) return timedOut === 'w' ? '0-1' : '1-0';
     if (drawAgreed) return '1/2-1/2';
     if (resigned) return turn === 'w' ? '0-1' : '1-0';
@@ -501,6 +528,8 @@ export default function Home() {
     setLocalMoves([]);
     setReviewIdx(null);
     setStarted(true);
+    setAutoResign(null);
+    setCvcResignResult(null);
     const tc = TIME_CONTROLS[timeControl];
     setWhiteClock(tc.initial);
     setBlackClock(tc.initial);
@@ -1112,7 +1141,15 @@ export default function Home() {
   // pursuing checkmate and never allowing threefold repetition. Move cadence
   // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
-    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo || !started) return;
+    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo || !started || autoResign) return;
+    // Auto-resign: if the side to move has only a king and the opponent has at
+    // least 2 real pieces, the lone-king side offers to resign instead of
+    // moving. The visible offer→accept flow is driven by the effect below.
+    const resignLoser = loneKingLoser(localState);
+    if (resignLoser && localState.turn === resignLoser) {
+      setAutoResign({ loser: resignLoser, phase: 'offer' });
+      return;
+    }
     // A fresh game (no moves yet) picks a new opening for this exhibition and,
     // per side, may roll an opening target (a random enemy piece to attack).
     if (localMoves.length === 0) {
@@ -1169,7 +1206,22 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, turn, localMoves, started]);
+  }, [mode, gameOver, promo, localState, turn, localMoves, started, autoResign]);
+
+  // AI vs AI agreed-resignation flow: show "offers to resign", then "accepts",
+  // then end the game so the spectator sees both steps before the result.
+  useEffect(() => {
+    if (!autoResign) return undefined;
+    if (autoResign.phase === 'offer') {
+      const t = setTimeout(() => setAutoResign((a) => (a ? { ...a, phase: 'accepted' } : a)), 1600);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setCvcResignResult(autoResign.loser === 'w' ? 'white_resigns' : 'black_resigns');
+      setAutoResign(null);
+    }, 1300);
+    return () => clearTimeout(t);
+  }, [autoResign]);
 
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
@@ -1236,8 +1288,12 @@ export default function Home() {
       recordedRef.current = true;
       const result = timedOut === 'w' ? 'b' : 'w';
       recordGameResult(positionList, result);
+    } else if (cvcResignResult && isCvc) {
+      recordedRef.current = true;
+      const result = cvcResignResult === 'white_resigns' ? 'b' : 'w';
+      recordGameResult(positionList, result);
     }
-  }, [mode, gameOver, status, threefold, drawAgreed, resigned, timedOut, ghostOpponent, positionList, localMoves.length, turn]);
+  }, [mode, gameOver, status, threefold, drawAgreed, resigned, timedOut, ghostOpponent, cvcResignResult, positionList, localMoves.length, turn]);
 
   function advance() {
     setDifficulty((d) => Math.min(10, d + 1));
@@ -1250,7 +1306,13 @@ export default function Home() {
   }
 
   let statusText;
-  if (!started && mode !== 'online') {
+  if (autoResign) {
+    const loserName = autoResign.loser === 'w' ? 'White' : 'Black';
+    const winnerName = autoResign.loser === 'w' ? 'Black' : 'White';
+    statusText = autoResign.phase === 'offer'
+      ? `${loserName} offers to resign`
+      : `${winnerName} accepts — ${winnerName} wins`;
+  } else if (!started && mode !== 'online') {
     statusText = 'Press Start to begin';
   } else if (mode === 'online' && onlineGame) {
     if (onlineGame.status === 'waiting') {
@@ -1268,7 +1330,8 @@ export default function Home() {
       statusText = `${turn === 'w' ? 'White' : 'Black'}'s move`;
     }
   } else if (gameOver) {
-    if (timedOut) statusText = `${timedOut === 'w' ? 'White' : 'Black'} loses on time`;
+    if (cvcResignResult) statusText = cvcResignResult === 'white_resigns' ? 'White resigns — Black wins' : 'Black resigns — White wins';
+    else if (timedOut) statusText = `${timedOut === 'w' ? 'White' : 'Black'} loses on time`;
     else if (drawAgreed) statusText = 'Draw by agreement';
     else if (resigned)
       statusText =
@@ -1288,6 +1351,7 @@ export default function Home() {
   const showDifficulty = mode === 'computer' || (mode === 'online' && ghostOpponent);
 
   const banner = useMemo(() => {
+    if (cvcResignResult) return { title: cvcResignResult === 'white_resigns' ? 'White resigns' : 'Black resigns', subtitle: cvcResignResult === 'white_resigns' ? 'Black wins' : 'White wins' };
     if (status === 'checkmate') return { title: 'Checkmate', subtitle: `${turn === 'w' ? 'Black' : 'White'} wins` };
     if (status === 'stalemate') return { title: 'Stalemate', subtitle: 'Draw' };
     if (status === 'fifty_move') return { title: 'Draw', subtitle: '50-move rule' };
@@ -1315,6 +1379,7 @@ export default function Home() {
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+      {autoResign && <ResignFlowBanner loser={autoResign.loser} phase={autoResign.phase} />}
       {!started && mode !== 'online' && (
         <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-stone-900/25 backdrop-blur-[1px]">
           <Button
@@ -1611,7 +1676,7 @@ export default function Home() {
                     or an opposing Truth — otherwise it acts as a passive blocker. It controls the squares it
                     slides to, so it can deliver check and checkmate. The Truth is free to move from the start, just like any other piece.
                   </li>
-                  <li>• Pawns reaching the last rank promote (choose Q, R, B, or N).</li>
+                  <li>• Pawns reaching the last rank promote (choose Q, R, B, N, or T for a Truth).</li>
                   <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>
                 </ul>
                 <Link
@@ -1666,27 +1731,40 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-[300px]">
             <p className="text-center text-sm font-medium text-stone-600 mb-4">Promote pawn to:</p>
-            <div className="grid grid-cols-4 gap-2">
-              {['Q', 'R', 'B', 'N'].map((t) => (
+            <div className="grid grid-cols-5 gap-2">
+              {['Q', 'R', 'B', 'N', 'T'].map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => choosePromo(t)}
                   className="aspect-square rounded-xl bg-stone-50 ring-1 ring-stone-200 hover:bg-amber-100 hover:ring-amber-400 transition flex items-center justify-center"
                 >
-                  <span
-                    className="leading-none"
-                    style={{
-                      fontSize: '2rem',
-                      color: promo.color === 'w' ? '#f8fafc' : '#1f2937',
-                      textShadow:
-                        promo.color === 'w'
-                          ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
-                          : '0 1px 1px rgba(255,255,255,0.25)',
-                    }}
-                  >
-                    {GLYPHS[t]}
-                  </span>
+                  {t === 'T' ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-8 h-8"
+                      style={promo.color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
+                    >
+                      <polygon points="5,23 19,23 12,15" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" strokeLinejoin="round" />
+                      <rect x="10" y="0" width="4" height="23" rx="1.5" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" />
+                      <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" />
+                      <circle cx="12" cy="8.5" r="2.6" fill="#facc15" stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.3" />
+                    </svg>
+                  ) : (
+                    <span
+                      className="leading-none"
+                      style={{
+                        fontSize: '2rem',
+                        color: promo.color === 'w' ? '#f8fafc' : '#1f2937',
+                        textShadow:
+                          promo.color === 'w'
+                            ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
+                            : '0 1px 1px rgba(255,255,255,0.25)',
+                      }}
+                    >
+                      {GLYPHS[t]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

@@ -15,6 +15,10 @@ import {
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
+// Truth-as-blocker is prioritized over Truth-as-checker: the blockade terms in
+// evaluate() are scaled up by this factor, and Truth-delivered checks get a
+// reduced aggression bonus below.
+const TRUTH_BLOCK_BOOST = 1.7;
 
 // A "hanging check": the moved piece delivers check, is NOT defended by any
 // friendly piece, and the opposing King can legally capture it — a free piece
@@ -348,6 +352,29 @@ function evaluate(board) {
     }
   }
 
+  // Always-on Truth safety: avoid leaving a Truth where the enemy King or
+  // enemy Truth can capture it without a friendly King/Truth to recapture —
+  // the variant's signature "unfair trade." Quiescence catches captures at
+  // the leaves; this is the static safety net that runs at every level.
+  {
+    for (const t of wT) {
+      const [r, f] = t;
+      const kThreat = bK && chebyshev(bK, [r, f]) === 1;
+      const tThreat = truthAttacksSquare(board, r, f, 'b');
+      if (!kThreat && !tThreat) continue;
+      const defended = (wK && chebyshev(wK, [r, f]) === 1) || truthAttacksSquare(board, r, f, 'w');
+      if (!defended) score -= VALUES.T * 0.5;
+    }
+    for (const t of bT) {
+      const [r, f] = t;
+      const kThreat = wK && chebyshev(wK, [r, f]) === 1;
+      const tThreat = truthAttacksSquare(board, r, f, 'w');
+      if (!kThreat && !tThreat) continue;
+      const defended = (bK && chebyshev(bK, [r, f]) === 1) || truthAttacksSquare(board, r, f, 'b');
+      if (!defended) score += VALUES.T * 0.5;
+    }
+  }
+
   // --- Truth blockade -----------------------------------------------------
   // Truth pieces are passive blockers (uncapturable except by the enemy King),
   // so the engine should use them to cramp the opponent: sit in front of the
@@ -363,11 +390,11 @@ function evaluate(board) {
         if (d === 0 || d > 3) continue;
         const val = VALUES[e.type] / 100;
         const forward = t[0] > e.pos[0] ? 1 : 0; // below (white-side of) the black piece
-        score += opWeight * (4 - d) * val * (forward ? 2 : 0.5);
+        score += opWeight * (4 - d) * val * (forward ? 2 : 0.5) * TRUTH_BLOCK_BOOST;
       }
       const oppSide = t[0] < rc ? 1 : 0; // in black's half
       const central = 4.5 - Math.abs(t[1] - fc);
-      score += opPhase * oppSide * central * 3;
+      score += opPhase * oppSide * central * 3 * TRUTH_BLOCK_BOOST;
     }
     for (const t of bT) {
       for (const e of wPc) {
@@ -375,11 +402,11 @@ function evaluate(board) {
         if (d === 0 || d > 3) continue;
         const val = VALUES[e.type] / 100;
         const forward = t[0] < e.pos[0] ? 1 : 0; // above (black-side of) the white piece
-        score -= opWeight * (4 - d) * val * (forward ? 2 : 0.5);
+        score -= opWeight * (4 - d) * val * (forward ? 2 : 0.5) * TRUTH_BLOCK_BOOST;
       }
       const oppSide = t[0] > rc ? 1 : 0; // in white's half
       const central = 4.5 - Math.abs(t[1] - fc);
-      score -= opPhase * oppSide * central * 3;
+      score -= opPhase * oppSide * central * 3 * TRUTH_BLOCK_BOOST;
     }
   }
 
@@ -586,7 +613,7 @@ function negamax(state, color, depth, alpha, beta, ply) {
     if (timedOut) break;
     if (givesCheck) {
       if (isHangingCheck(ns.board, m, color)) sc -= VALUES[m.promotion ? 'Q' : m.piece.type];
-      else if (aggressive) sc += CHECK_BONUS;
+      else if (aggressive) sc += (m.piece.type === 'T' ? CHECK_BONUS * 0.3 : CHECK_BONUS);
     }
     if (sc > best) { best = sc; bestMove = m; }
     if (best > alpha) { alpha = best; flag = FLAG.EXACT; }
@@ -708,7 +735,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       let sc = -negamax(ns, opp, d - 1 + ext, -Infinity, -alpha, 1);
       if (givesCheck) {
         if (isHangingCheck(ns.board, m, color)) sc -= VALUES[m.promotion ? 'Q' : m.piece.type];
-        else if (aggressive) sc += CHECK_BONUS;
+        else if (aggressive) sc += (m.piece.type === 'T' ? CHECK_BONUS * 0.3 : CHECK_BONUS);
       }
       if (timedOut && d > 1) break;
       if (sc > curBestScore) { curBestScore = sc; curBest = m; }
