@@ -154,6 +154,11 @@ export default function Home() {
   // `cvcResignResult` ends the game.
   const [autoResign, setAutoResign] = useState(null);
   const [cvcResignResult, setCvcResignResult] = useState(null);
+  // vs Computer: the human's color for the current game. Default White; a
+  // player who wins as Black earns White for the next game (traditional chess).
+  const [playerColor, setPlayerColor] = useState('w');
+  const wonAsBlackRef = useRef(false);
+  const computerColor = playerColor === 'w' ? 'b' : 'w';
 
   // online
   const [me, setMe] = useState(null);
@@ -309,16 +314,16 @@ export default function Home() {
   const effectiveFlipped = useMemo(() => {
     if (mode === 'local') return autoFlip ? turn === 'b' : flipped;
     if (mode === 'online') return myColor === 'b' ? !flipped : flipped;
-    return flipped; // computer
-  }, [mode, autoFlip, turn, flipped, myColor]);
+    return (playerColor === 'b') !== flipped; // computer
+  }, [mode, autoFlip, turn, flipped, myColor, playerColor]);
 
   const humanToMove = useMemo(() => {
     if (!state || gameOver || resigned || drawAgreed || submitting || promo || reviewing) return false;
     if (mode === 'local') return started;
-    if (mode === 'computer') return started && turn === 'w';
+    if (mode === 'computer') return started && turn === playerColor;
     if (mode === 'online') return onlineGame?.status === 'active' && !!myColor && turn === myColor;
     return false;
-  }, [state, gameOver, resigned, drawAgreed, submitting, promo, reviewing, mode, turn, myColor, onlineGame?.status, started]);
+  }, [state, gameOver, resigned, drawAgreed, submitting, promo, reviewing, mode, turn, myColor, onlineGame?.status, started, playerColor]);
 
   const resultStr = useMemo(() => {
     if (mode === 'online' && onlineGame) {
@@ -341,7 +346,7 @@ export default function Home() {
   function handleSquareClick(r, f) {
     if (reviewing || gameOver || promo || submitting) return;
     if (mode === 'cvc' || mode === 'cvc_turbo') return;
-    if (mode === 'computer' && turn === 'b') return;
+    if (mode === 'computer' && turn === computerColor) return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active') return;
       if (!myColor || turn !== myColor) return;
@@ -378,7 +383,7 @@ export default function Home() {
   function handleDropMove(from, to) {
     if (reviewing || gameOver || promo || submitting) return;
     if (mode === 'cvc' || mode === 'cvc_turbo') return;
-    if (mode === 'computer' && turn === 'b') return;
+    if (mode === 'computer' && turn === computerColor) return;
     if (mode === 'online') {
       if (!onlineGame || onlineGame.status !== 'active' || !myColor || turn !== myColor) return;
     }
@@ -510,6 +515,10 @@ export default function Home() {
   }
 
   function resetLocal() {
+    if (wonAsBlackRef.current) {
+      setPlayerColor('w');
+      wonAsBlackRef.current = false;
+    }
     cleanupComputerBroadcast();
     setLocalState(initialState());
     setSelected(null);
@@ -527,7 +536,7 @@ export default function Home() {
     setTimedOut(null);
     setLocalMoves([]);
     setReviewIdx(null);
-    setStarted(true);
+    setStarted(false);
     setAutoResign(null);
     setCvcResignResult(null);
     const tc = TIME_CONTROLS[timeControl];
@@ -934,11 +943,12 @@ export default function Home() {
         };
         try {
           if (!id) {
+            const playerIsWhite = playerColor === 'w';
             const rec = await base44.entities.Game.create({
               code: generateCode(),
-              host_color: 'w',
-              white_player_id: identity.id,
-              black_player_id: '__computer__',
+              host_color: playerColor,
+              white_player_id: playerIsWhite ? identity.id : '__computer__',
+              black_player_id: playerIsWhite ? '__computer__' : identity.id,
               ...payload,
             });
             computerGameRef.current = rec;
@@ -1104,26 +1114,31 @@ export default function Home() {
   // twenty-three) for as long as the human's moves keep the book on track, then
   // plays the search engine. Never allows threefold repetition.
   useEffect(() => {
-    if (mode !== 'computer' || turn !== 'b' || gameOver || promo || !started) return;
+    if (mode !== 'computer' || turn !== computerColor || gameOver || promo || !started) return;
     if (!openingRef.current.book) {
-      openingRef.current = { book: randomOpening(), bTarget: rollOpeningTarget('b', localState.board) };
+      openingRef.current = {
+        book: randomOpening(),
+        wTarget: computerColor === 'w' ? rollOpeningTarget('w', localState.board) : null,
+        bTarget: computerColor === 'b' ? rollOpeningTarget('b', localState.board) : null,
+      };
     }
     setThinking(true);
     const t = setTimeout(() => {
-      const legal = allLegalMoves(localState, 'b');
-      const scripted = openingRef.current.bTarget
+      const legal = allLegalMoves(localState, computerColor);
+      const sideTarget = computerColor === 'w' ? openingRef.current.wTarget : openingRef.current.bTarget;
+      const scripted = sideTarget
         ? null
-        : bookMove(openingRef.current.book, localMoves.length, legal, 'b');
+        : bookMove(openingRef.current.book, localMoves.length, legal, computerColor);
       let move;
       if (scripted) move = scripted;
       else {
         const ctx = {
           ply: localMoves.length,
-          wTarget: null,
+          wTarget: openingRef.current.wTarget ? openingRef.current.wTarget.type : null,
           bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
           positionKeys: positionList.map((p) => positionKey(p.state)),
         };
-        move = bestMove(localState, 'b', difficulty, false, ctx);
+        move = bestMove(localState, computerColor, difficulty, false, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');
@@ -1134,7 +1149,7 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, difficulty, turn, localMoves, started]);
+  }, [mode, gameOver, promo, localState, difficulty, turn, localMoves, started, computerColor]);
 
   // computer vs computer: each side opens with a randomly chosen traditional
   // opening (one of twenty-three), then auto-plays at level 6 — aggressively
@@ -1243,10 +1258,19 @@ export default function Home() {
   }, [mode, ghostOpponent, onlineGame, state, turn, myColor, gameOver, submitting, promo, difficulty]);
 
   useEffect(() => {
-    if (mode === 'computer' && status === 'checkmate' && turn === 'b' && difficulty < 10) {
+    if (mode === 'computer' && status === 'checkmate' && turn === computerColor && difficulty < 10) {
       setPendingAdvance(true);
     }
-  }, [status, turn, mode, difficulty]);
+  }, [status, turn, mode, difficulty, computerColor]);
+
+  // Traditional color-swap: a player who wins as Black earns White for the
+  // next game. Detected at game end; applied on the next reset.
+  useEffect(() => {
+    if (mode !== 'computer') return;
+    if (status === 'checkmate' && turn !== playerColor && playerColor === 'b') {
+      wonAsBlackRef.current = true;
+    }
+  }, [mode, status, turn, playerColor]);
 
   // Checkmate learning (all modes): whenever a game ends in checkmate, record
   // the winning line into the shared, server-backed mate book so the AI can
@@ -1518,6 +1542,31 @@ export default function Home() {
                       ))}
                     </select>
                   </div>
+                  {mode === 'computer' && (
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[0.6rem] uppercase tracking-widest text-stone-400 px-1">Your color</p>
+                      <div className="flex gap-1">
+                        {[
+                          { c: 'w', label: 'White' },
+                          { c: 'b', label: 'Black' },
+                        ].map((o) => (
+                          <button
+                            key={o.c}
+                            type="button"
+                            disabled={started}
+                            onClick={() => setPlayerColor(o.c)}
+                            className={`flex-1 h-8 px-2 text-xs rounded-lg border transition ${
+                              playerColor === o.c
+                                ? 'bg-stone-800 text-white border-stone-800'
+                                : 'bg-white/90 text-stone-600 border-stone-300 hover:bg-stone-100'
+                            } disabled:opacity-60 disabled:cursor-not-allowed`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame && !spectator && myColor)) && (
                     <Button
                       size="sm"
