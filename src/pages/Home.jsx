@@ -90,6 +90,10 @@ export default function Home() {
   const kingOnlySinceRef = useRef(null);
   const computerGameRef = useRef(null);
   const computerBroadcastRef = useRef({ queue: [], gameOver: false, status: 'playing', turn: 'w', processing: false });
+  // Refs mirror the current online game/color so unmount/beforeunload cleanup
+  // can forfeit an active game when the player leaves the page.
+  const onlineGameRef = useRef(null);
+  const myColorRef = useRef(null);
 
   // batch-1 additions
   const [flipped, setFlipped] = useState(false);
@@ -115,6 +119,7 @@ export default function Home() {
   const [animateMove, setAnimateMove] = useState(null);
   const [showPro, setShowPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // online
   const [me, setMe] = useState(null);
@@ -462,6 +467,12 @@ export default function Home() {
     }, 30);
   }
 
+  function startGame() {
+    setStarted(true);
+    setStartMs(Date.now());
+    setElapsed(0);
+  }
+
   function resetLocal() {
     cleanupComputerBroadcast();
     setLocalState(initialState());
@@ -480,6 +491,7 @@ export default function Home() {
     setTimedOut(null);
     setLocalMoves([]);
     setReviewIdx(null);
+    setStarted(true);
     const tc = TIME_CONTROLS[timeControl];
     setWhiteClock(tc.initial);
     setBlackClock(tc.initial);
@@ -623,6 +635,18 @@ export default function Home() {
       } else if (onlineGame.status === 'waiting' && onlineGame.white_player_id === identity?.id) {
         try {
           await base44.entities.Game.delete(onlineGame.id);
+        } catch {
+          // ignore
+        }
+      } else if (onlineGame.status === 'active' && myColor) {
+        // Leaving an active online game is an immediate forfeit — the opponent
+        // wins and the game is purged from the lobby so it can't linger.
+        try {
+          const winner = myColor === 'w' ? 'black_wins' : 'white_wins';
+          await base44.entities.Game.update(onlineGame.id, {
+            status: 'finished',
+            result: winner,
+          });
         } catch {
           // ignore
         }
