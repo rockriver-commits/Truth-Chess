@@ -787,6 +787,7 @@ export default function Home() {
     setGhostOpponent(false);
     prevMovesLen.current = game.moves?.length || 0;
     setOnlineGame(game);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function startGhost() {
