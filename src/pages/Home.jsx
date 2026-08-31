@@ -279,11 +279,11 @@ export default function Home() {
 
   const humanToMove = useMemo(() => {
     if (!state || gameOver || resigned || drawAgreed || submitting || promo || reviewing) return false;
-    if (mode === 'local') return true;
-    if (mode === 'computer') return turn === 'w';
+    if (mode === 'local') return started;
+    if (mode === 'computer') return started && turn === 'w';
     if (mode === 'online') return onlineGame?.status === 'active' && !!myColor && turn === myColor;
     return false;
-  }, [state, gameOver, resigned, drawAgreed, submitting, promo, reviewing, mode, turn, myColor, onlineGame?.status]);
+  }, [state, gameOver, resigned, drawAgreed, submitting, promo, reviewing, mode, turn, myColor, onlineGame?.status, started]);
 
   const resultStr = useMemo(() => {
     if (mode === 'online' && onlineGame) {
@@ -762,7 +762,21 @@ export default function Home() {
       }
       const liveWaiting = (waiting || []).filter((g) => !stale.find((s) => s.id === g.id));
       setOpenGames(liveWaiting);
-      setActiveGames(active || []);
+      // Also prune active games that never got off the ground: an active game
+      // with zero moves untouched for 30 minutes means both players left —
+      // delete it so it stops showing in "watch live games".
+      const activeCutoff = Date.now() - 30 * 60 * 1000;
+      const staleActive = (active || []).filter((g) => {
+        if (onlineGame && g.id === onlineGame.id) return false;
+        if ((g.moves || []).length > 0) return false;
+        const ts = g.last_move_at ? Date.parse(g.last_move_at) : Date.parse(g.created_date);
+        return !isNaN(ts) && ts < activeCutoff;
+      });
+      if (staleActive.length) {
+        await Promise.all(staleActive.map((g) => base44.entities.Game.delete(g.id).catch(() => {})));
+      }
+      const liveActive = (active || []).filter((g) => !staleActive.find((s) => s.id === g.id));
+      setActiveGames(liveActive);
     } catch {
       // ignore
     }
@@ -958,13 +972,38 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, localMoves, gameOver, status, turn]);
 
-  // Delete the vs-Computer broadcast record if the page unmounts mid-game so
-  // it doesn't linger as an "active" game no one is playing.
+  // Keep refs of the current online game and color in sync so unmount and
+  // beforeunload cleanup can forfeit an active game when the player leaves.
+  useEffect(() => { onlineGameRef.current = onlineGame; }, [onlineGame]);
+  useEffect(() => { myColorRef.current = myColor; }, [myColor]);
+
+  // Forfeit an active online game if the player closes the tab outright.
+  useEffect(() => {
+    function onBeforeUnload() {
+      const g = onlineGameRef.current;
+      const mc = myColorRef.current;
+      if (!g || g.status !== 'active' || !mc) return;
+      const winner = mc === 'w' ? 'black_wins' : 'white_wins';
+      base44.entities.Game.update(g.id, { status: 'finished', result: winner }).catch(() => {});
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
+  // Delete the vs-Computer broadcast record and forfeit any active online
+  // game when the page unmounts (route navigation) so neither lingers as an
+  // "active" game no one is playing.
   useEffect(() => {
     return () => {
       const g = computerGameRef.current;
       if (g) {
         base44.entities.Game.delete(g.id).catch(() => {});
+      }
+      const og = onlineGameRef.current;
+      const mc = myColorRef.current;
+      if (og && og.status === 'active' && mc) {
+        const winner = mc === 'w' ? 'black_wins' : 'white_wins';
+        base44.entities.Game.update(og.id, { status: 'finished', result: winner }).catch(() => {});
       }
     };
   }, []);
@@ -990,7 +1029,7 @@ export default function Home() {
 
   // per-side countdown clocks (local & computer, timed control)
   useEffect(() => {
-    if (mode === 'online' || gameOver) return undefined;
+    if (mode === 'online' || gameOver || !started) return undefined;
     let last = Date.now();
     const id = setInterval(() => {
       const now = Date.now();
@@ -1001,7 +1040,7 @@ export default function Home() {
     }, 200);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, timeControl, turn]);
+  }, [mode, gameOver, timeControl, turn, started]);
 
   // flag on time out
   useEffect(() => {
@@ -1020,7 +1059,7 @@ export default function Home() {
   // twenty-three) for as long as the human's moves keep the book on track, then
   // plays the search engine. Never allows threefold repetition.
   useEffect(() => {
-    if (mode !== 'computer' || turn !== 'b' || gameOver || promo) return;
+    if (mode !== 'computer' || turn !== 'b' || gameOver || promo || !started) return;
     if (!openingRef.current.book) {
       openingRef.current = { book: randomOpening(), bTarget: rollOpeningTarget('b', localState.board) };
     }
@@ -1050,14 +1089,14 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, difficulty, turn, localMoves]);
+  }, [mode, gameOver, promo, localState, difficulty, turn, localMoves, started]);
 
   // computer vs computer: each side opens with a randomly chosen traditional
   // opening (one of twenty-three), then auto-plays at level 6 — aggressively
   // pursuing checkmate and never allowing threefold repetition. Move cadence
   // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
-    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo) return;
+    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo || !started) return;
     // A fresh game (no moves yet) picks a new opening for this exhibition and,
     // per side, may roll an opening target (a random enemy piece to attack).
     if (localMoves.length === 0) {
@@ -1114,7 +1153,7 @@ export default function Home() {
       setThinking(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, promo, localState, turn, localMoves]);
+  }, [mode, gameOver, promo, localState, turn, localMoves, started]);
 
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
@@ -1173,7 +1212,9 @@ export default function Home() {
   }
 
   let statusText;
-  if (mode === 'online' && onlineGame) {
+  if (!started && mode !== 'online') {
+    statusText = 'Press Start to begin';
+  } else if (mode === 'online' && onlineGame) {
     if (onlineGame.status === 'waiting') {
       statusText = 'Waiting for opponent…';
     } else if (onlineGame.status === 'finished') {
@@ -1236,6 +1277,17 @@ export default function Home() {
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+      {!started && mode !== 'online' && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-stone-900/25 backdrop-blur-[1px]">
+          <Button
+            onClick={startGame}
+            size="lg"
+            className="px-8 text-base font-semibold shadow-lg"
+          >
+            Start
+          </Button>
+        </div>
+      )}
     </div>
   );
 
