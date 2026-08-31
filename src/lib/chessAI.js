@@ -39,14 +39,20 @@ const _bAtk = new Int16Array(FILES * RANKS);
 // random legal move (weakens low levels), quiescence = capture-extension on,
 // timeMs = soft budget for iterative deepening (caps thinking time on mobile).
 export const DIFFICULTIES = {
-  1: { depth: 1, randomness: 0.60, quiescence: false, timeMs: 250 },
-  2: { depth: 1, randomness: 0.25, quiescence: false, timeMs: 350 },
-  3: { depth: 2, randomness: 0.15, quiescence: false, timeMs: 600 },
-  4: { depth: 3, randomness: 0.00, quiescence: true,  timeMs: 850 },
-  5: { depth: 6, randomness: 0.00, quiescence: true,  timeMs: 1200 },
-  6: { depth: 10, randomness: 0.00, quiescence: true,  timeMs: 1800 },
-  7: { depth: 15, randomness: 0.00, quiescence: true,  timeMs: 2500 },
-  8: { depth: 15, randomness: 0.00, quiescence: true,  timeMs: 4500 },
+  // Every level plays strong from the start — full quiescence search, no
+  // random moves. Each level searches a little deeper (and a little longer)
+  // than the one below it, so difficulty scales smoothly from 1 (strong) to
+  // 10 (strongest).
+  1:  { depth: 4,  randomness: 0.00, quiescence: true, timeMs: 700 },
+  2:  { depth: 5,  randomness: 0.00, quiescence: true, timeMs: 850 },
+  3:  { depth: 6,  randomness: 0.00, quiescence: true, timeMs: 1000 },
+  4:  { depth: 7,  randomness: 0.00, quiescence: true, timeMs: 1200 },
+  5:  { depth: 8,  randomness: 0.00, quiescence: true, timeMs: 1500 },
+  6:  { depth: 10, randomness: 0.00, quiescence: true, timeMs: 1900 },
+  7:  { depth: 12, randomness: 0.00, quiescence: true, timeMs: 2400 },
+  8:  { depth: 14, randomness: 0.00, quiescence: true, timeMs: 3100 },
+  9:  { depth: 16, randomness: 0.00, quiescence: true, timeMs: 4000 },
+  10: { depth: 18, randomness: 0.00, quiescence: true, timeMs: 5500 },
 };
 
 // --- Zobrist hashing for the transposition table ---------------------------

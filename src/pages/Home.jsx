@@ -1182,7 +1182,7 @@ export default function Home() {
   }, [mode, ghostOpponent, onlineGame, state, turn, myColor, gameOver, submitting, promo, difficulty]);
 
   useEffect(() => {
-    if (mode === 'computer' && status === 'checkmate' && turn === 'b' && difficulty < 8) {
+    if (mode === 'computer' && status === 'checkmate' && turn === 'b' && difficulty < 10) {
       setPendingAdvance(true);
     }
   }, [status, turn, mode, difficulty]);
@@ -1209,7 +1209,7 @@ export default function Home() {
   }, [mode, gameOver, status, threefold, positionList, localMoves.length]);
 
   function advance() {
-    setDifficulty((d) => Math.min(8, d + 1));
+    setDifficulty((d) => Math.min(10, d + 1));
     setPendingAdvance(false);
     resetLocal();
   }
@@ -1670,7 +1670,7 @@ export default function Home() {
             <p className="text-sm text-stone-500 mt-1 mb-4">Advance to the next difficulty?</p>
             <div className="grid grid-cols-2 gap-2">
               <Button onClick={stay} variant="outline">Stay</Button>
-              <Button onClick={advance}>Level {Math.min(8, difficulty + 1)}</Button>
+              <Button onClick={advance}>Level {Math.min(10, difficulty + 1)}</Button>
             </div>
           </div>
         </div>
