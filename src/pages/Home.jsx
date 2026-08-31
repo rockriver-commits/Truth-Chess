@@ -723,7 +723,21 @@ export default function Home() {
         base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50),
         base44.entities.Game.filter({ status: 'active' }, 'created_date', 50),
       ]);
-      setOpenGames(waiting || []);
+      // Prune waiting games whose creator has gone away: if no one has joined
+      // within 10 minutes (last_move_at set at creation), the host likely closed
+      // their browser — delete the stale record so it stops showing in the
+      // lobby. Avoid deleting the game this client is currently waiting in.
+      const cutoff = Date.now() - 10 * 60 * 1000;
+      const stale = (waiting || []).filter((g) => {
+        if (onlineGame && g.id === onlineGame.id) return false;
+        const ts = g.last_move_at ? Date.parse(g.last_move_at) : Date.parse(g.created_date);
+        return !isNaN(ts) && ts < cutoff;
+      });
+      if (stale.length) {
+        await Promise.all(stale.map((g) => base44.entities.Game.delete(g.id).catch(() => {})));
+      }
+      const liveWaiting = (waiting || []).filter((g) => !stale.find((s) => s.id === g.id));
+      setOpenGames(liveWaiting);
       setActiveGames(active || []);
     } catch {
       // ignore
