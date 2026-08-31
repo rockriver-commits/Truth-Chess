@@ -1081,14 +1081,56 @@ export default function Home() {
             {boardEl}
           </div>
         )}
-        <header className="text-center mb-8">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600/80">
+        <header className="relative mb-8">
+          <p className="text-center text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600/80">
             A Chess Variant
           </p>
-          <h1 className="mt-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800">
-            Truth Chess
-          </h1>
-          <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto">
+          <div className="relative mt-2 flex items-center justify-center">
+            <h1 className="inline-flex items-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800">
+              Truth Chess
+              <svg
+                viewBox="0 0 24 24"
+                className="h-[0.85em] w-[0.85em] shrink-0"
+                role="img"
+                aria-label="Truth piece"
+              >
+                <defs>
+                  <linearGradient id="tcVert" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#64748b" />
+                    <stop offset="0.5" stopColor="#0f172a" />
+                    <stop offset="1" stopColor="#020617" />
+                  </linearGradient>
+                  <linearGradient id="tcBar" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stopColor="#0b1220" />
+                    <stop offset="0.5" stopColor="#475569" />
+                    <stop offset="1" stopColor="#0b1220" />
+                  </linearGradient>
+                  <radialGradient id="tcJewel" cx="0.35" cy="0.35" r="0.75">
+                    <stop offset="0" stopColor="#fef9c3" />
+                    <stop offset="0.5" stopColor="#facc15" />
+                    <stop offset="1" stopColor="#a16207" />
+                  </radialGradient>
+                  <filter id="tcShadow" x="-40%" y="-40%" width="180%" height="180%">
+                    <feDropShadow dx="0" dy="1.2" stdDeviation="1" floodColor="#000" floodOpacity="0.5" />
+                  </filter>
+                </defs>
+                <g filter="url(#tcShadow)">
+                  <polygon points="5,23 19,23 12,15" fill="url(#tcVert)" />
+                  <rect x="10" y="1" width="4" height="21" rx="1.5" fill="url(#tcVert)" />
+                  <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill="url(#tcBar)" />
+                  <circle cx="12" cy="8.5" r="2.6" fill="url(#tcJewel)" stroke="#0f172a" strokeWidth="0.4" />
+                </g>
+              </svg>
+            </h1>
+            <Button
+              onClick={donate}
+              disabled={upgrading}
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-3 h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
+            >
+              {upgrading ? 'Redirecting…' : '💛 Support — $5'}
+            </Button>
+          </div>
+          <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto text-center">
             On a ten×9 board with a piece that seeks Truth from the king{' '}
             <span className="inline-flex align-middle mx-0.5" title="Truth piece">
               <svg viewBox="0 0 24 24" width="16" height="16" style={{ display: 'inline-block' }}>
@@ -1101,15 +1143,6 @@ export default function Home() {
             , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
             truth pieces and can put the king in Check. Conversely, the King can take the Truth.
           </p>
-          <div className="mt-5 flex justify-center">
-            <Button
-              onClick={donate}
-              disabled={upgrading}
-              className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-6 h-11 rounded-full shadow-sm"
-            >
-              {upgrading ? 'Redirecting…' : '💛 Support Truth Chess — $5'}
-            </Button>
-          </div>
         </header>
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
