@@ -16,6 +16,7 @@ import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onl
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
+import { useToast } from '@/components/ui/use-toast';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import OnlinePanel from '@/components/OnlinePanel';
@@ -98,6 +99,7 @@ export default function Home() {
   const [startMs, setStartMs] = useState(Date.now());
   const prevMovesLen = useRef(0);
   const playSound = useChessSounds(soundOn);
+  const { toast } = useToast();
 
   // batch-2 additions
   const [localMoves, setLocalMoves] = useState([]);
@@ -146,11 +148,14 @@ export default function Home() {
 
   const isPro = me?.plan === 'pro';
   const gamesPlayed = me?.games_played || 0;
-  const trialActive = !!me && gamesPlayed < TRIAL_GAMES;
+  const bonusGames = me?.bonus_games || 0;
+  const gamesAllowed = TRIAL_GAMES + bonusGames;
+  const trialActive = !!me && gamesPlayed < gamesAllowed;
   // Free trial: everyone gets all modes for their first 55 games, then the Pro
-  // paywall applies. Admins and Pro subscribers always have full access.
+  // paywall applies. Beating the computer earns bonus games. Admins and Pro
+  // subscribers always have full access.
   const hasAccess = isPro || me?.role === 'admin' || trialActive;
-  const gamesRemaining = Math.max(0, TRIAL_GAMES - gamesPlayed);
+  const gamesRemaining = Math.max(0, gamesAllowed - gamesPlayed);
   // Base44 Payments can't sell digital subscriptions inside mobile app stores,
   // so the Pro upgrade path is only shown in browsers (web), not the native apps.
   const canUpgrade = !isMobileApp();
@@ -1000,12 +1005,21 @@ export default function Home() {
       mode === 'local' || mode === 'computer' || (mode === 'online' && !spectator);
     if (!isParticipant || !me) return;
     countedRef.current = true;
-    const next = (me.games_played || 0) + 1;
-    base44.auth.updateMe({ games_played: next })
+    // Beat the computer (player is White) → award a bonus trial game.
+    const beatComputer = mode === 'computer' && status === 'checkmate' && turn === 'b';
+    const patch = { games_played: (me.games_played || 0) + 1 };
+    if (beatComputer) {
+      patch.bonus_games = (me.bonus_games || 0) + 1;
+      toast({
+        title: '🏆 You beat the computer!',
+        description: '+1 free game added to your trial.',
+      });
+    }
+    base44.auth.updateMe(patch)
       .then((u) => setMe(u))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, spectator, me]);
+  }, [mode, gameOver, spectator, me, status, turn]);
 
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));
@@ -1235,7 +1249,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
                 <span className="text-xs font-medium text-amber-600">
-                  {isPro ? '⚡ Pro' : me?.role === 'admin' ? '⚡ Admin' : hasAccess ? `Trial · ${gamesRemaining} left` : ''}
+                  {isPro ? '⚡ Pro' : me?.role === 'admin' ? '⚡ Admin' : hasAccess ? `Trial · ${gamesRemaining} left${bonusGames ? ` (+${bonusGames})` : ''}` : ''}
                 </span>
               </div>
               {!hasAccess && canUpgrade && (

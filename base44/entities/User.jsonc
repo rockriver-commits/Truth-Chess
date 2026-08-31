@@ -21,6 +21,11 @@
       "type": "number",
       "description": "Completed games by this user, used for the 55-game free trial.",
       "default": 0
+    },
+    "bonus_games": {
+      "type": "number",
+      "description": "Extra trial games earned by beating the computer.",
+      "default": 0
     }
   },
   "required": [

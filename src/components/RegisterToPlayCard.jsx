@@ -10,7 +10,8 @@ export default function RegisterToPlayCard() {
       <h2 className="text-2xl font-display font-semibold text-stone-800">Register to play</h2>
       <p className="text-sm text-stone-500 leading-relaxed">
         Create a free account to start playing. Your first 55 games are free across every mode —
-        after that, upgrade to Pro to keep playing 2-Player, Online, and the higher AI levels.
+        beat the computer to earn bonus games. After the trial, upgrade to Pro to keep playing
+        2-Player, Online, and the higher AI levels.
       </p>
       <div className="grid grid-cols-2 gap-3 pt-2">
         <Link to="/register"><Button className="w-full">Create account</Button></Link>
