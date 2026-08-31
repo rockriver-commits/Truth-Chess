@@ -1158,9 +1158,9 @@ export default function Home() {
                 )}
               </div>
               {state && (
-                <div className="flex flex-col gap-2 self-start mt-3">
-                  <CapturedSide pieces={viewCaptured.w} label="White captured" />
+                <div className="flex flex-col justify-between self-stretch py-3">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                  <CapturedSide pieces={viewCaptured.w} label="White captured" />
                 </div>
               )}
             </div>
