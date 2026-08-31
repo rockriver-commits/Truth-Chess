@@ -1049,7 +1049,7 @@ export default function Home() {
   // The board itself, shared between the in-flow (player) layout and the
   // sticky (spectator) layout so the ChessBoard props stay in one place.
   const boardEl = (
-    <div className="relative w-full max-w-[620px]">
+    <div className="relative w-full max-w-[540px]">
       <ChessBoard
         board={viewState.board}
         selected={reviewing ? null : selected}
@@ -1112,18 +1112,18 @@ export default function Home() {
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
-            <div className="w-full max-w-[620px] mb-3 space-y-2">
-              <div
-                className="grid gap-1 p-1 bg-stone-100 rounded-xl"
-                style={{ gridTemplateColumns: `repeat(${visibleModes.length}, minmax(0, 1fr))` }}
+            <div className="w-full flex justify-center gap-4">
+              <nav
+                className="flex flex-col gap-2 p-2 bg-stone-100 rounded-xl self-start"
+                aria-label="Game mode"
               >
                 {visibleModes.map((m) => (
                   <button
                     key={m.key}
                     type="button"
                     onClick={() => guardedChangeMode(m.key)}
-                    className={`py-1.5 text-[0.65rem] font-medium rounded-lg transition ${
-                      mode === m.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+                    className={`px-3 py-2 text-[0.7rem] font-medium rounded-lg whitespace-nowrap transition ${
+                      mode === m.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500 hover:text-stone-700'
                     }`}
                   >
                     {m.label}
@@ -1132,8 +1132,8 @@ export default function Home() {
                     )}
                   </button>
                 ))}
-              </div>
-            </div>
+              </nav>
+              <div className="flex flex-col items-center flex-1 min-w-0">
             {state ? (
               <>
                 {mode !== 'online' && timeControl !== 'unlimited' && (
@@ -1149,7 +1149,7 @@ export default function Home() {
                   <div className="my-3 w-full flex justify-center">{boardEl}</div>
                 )}
                 <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
-                <div className="w-full max-w-[620px] mx-auto mt-1 flex items-center justify-between gap-3">
+                <div className="w-full max-w-[540px] mx-auto mt-1 flex items-center justify-between gap-3">
                   <p
                     className={`text-base font-medium ${
                       status === 'checkmate' ? 'text-rose-600' : 'text-stone-800'
@@ -1172,7 +1172,7 @@ export default function Home() {
                     </Button>
                   </div>
                 </div>
-                <div className="w-full max-w-[620px] mx-auto mt-2">
+                <div className="w-full max-w-[540px] mx-auto mt-2">
                   <ThemePicker
                     boardTheme={boardTheme}
                     pieceStyle={pieceStyle}
@@ -1209,10 +1209,12 @@ export default function Home() {
                 )}
               </>
             ) : (
-              <div className="w-full max-w-[620px] aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
+              <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
                 Create or join an online game to start playing
               </div>
             )}
+              </div>
+            </div>
           </div>
 
           <aside className="space-y-5">
@@ -1471,7 +1473,7 @@ export default function Home() {
 
 function CapturedRow({ pieces, label }) {
   return (
-    <div className="w-full max-w-[620px] mx-auto h-7 flex items-center gap-1 px-1">
+    <div className="w-full max-w-[540px] mx-auto h-7 flex items-center gap-1 px-1">
       <span className="text-[0.65rem] uppercase tracking-widest text-stone-400 mr-1 hidden sm:inline">
         {label}
       </span>
