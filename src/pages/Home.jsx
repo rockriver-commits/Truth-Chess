@@ -1176,7 +1176,7 @@ export default function Home() {
                     </button>
                   ))}
                 </nav>
-                <div className="flex flex-col gap-1.5 mt-auto">
+                <div className="flex flex-col gap-1.5 mt-auto mb-8">
                   {mode !== 'online' && (
                     <Button
                       size="sm"
@@ -1213,12 +1213,7 @@ export default function Home() {
               {state && (
                 <div className="flex flex-col justify-between self-stretch py-3">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
-                  <div className="flex flex-col items-center gap-2">
-                    <span
-                      className={`w-3.5 h-3.5 rounded-full animate-pulse ${
-                        turn === 'w' ? 'bg-white ring-2 ring-rose-500' : 'bg-stone-900 ring-2 ring-rose-500'
-                      }`}
-                    />
+                  <div className="flex flex-col items-center">
                     <p
                       key={statusText + turn}
                       className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"

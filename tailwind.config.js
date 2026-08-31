@@ -99,7 +99,7 @@ module.exports = {
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
-  			'status-flash': 'status-flash 0.9s ease-in-out infinite'
+  			'status-flash': 'status-flash 1.8s ease-in-out infinite'
   		}
   	}
   },
