@@ -51,7 +51,7 @@ export default function Feedback() {
         </h1>
         <p className="mt-2 text-stone-500">
           Tell me what you think of Truth Chess — bug reports, ideas, or just a note. Your
-          comment is sent straight to me; my email address stays private.
+          comment is sent directly to the developer.
         </p>
 
         {done ? (
