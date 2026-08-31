@@ -1193,27 +1193,25 @@ export default function Home() {
                       </select>
                     </div>
                   )}
+                  {mode === 'local' && !gameOver && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={offerDraw}
+                      className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 justify-center"
+                    >
+                      Draw
+                    </Button>
+                  )}
                   {(mode === 'local' || mode === 'computer') && !gameOver && (
-                    <div className="flex gap-1.5">
-                      {mode === 'local' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={offerDraw}
-                          className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 flex-1"
-                        >
-                          Draw
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={resign}
-                        className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 flex-1"
-                      >
-                        Resign
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={resign}
+                      className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 justify-center"
+                    >
+                      Resign
+                    </Button>
                   )}
                   {mode !== 'online' && (
                     <Button
