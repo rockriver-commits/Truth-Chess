@@ -84,11 +84,22 @@ module.exports = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'status-flash': {
+  				'0%, 100%': {
+  					transform: 'scale(1)',
+  					color: '#475569'
+  				},
+  				'50%': {
+  					transform: 'scale(1.35)',
+  					color: '#dc2626'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'status-flash': 'status-flash 0.9s ease-in-out infinite'
   		}
   	}
   },

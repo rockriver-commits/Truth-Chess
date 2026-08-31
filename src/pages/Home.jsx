@@ -33,7 +33,7 @@ import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
 import EmailListPanel from '@/components/EmailListPanel';
 import { loadAdSense } from '@/lib/adsense';
-import { Users, Computer, Globe, Bot } from 'lucide-react';
+import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
@@ -1061,26 +1061,6 @@ export default function Home() {
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
-      <div className="absolute top-1/2 -translate-y-1/2 left-1.5 flex flex-col gap-1.5 z-20 pointer-events-none">
-        {mode !== 'online' && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={resetLocal}
-            className="pointer-events-auto h-7 px-2 text-[0.65rem] bg-white/85 backdrop-blur border-stone-300"
-          >
-            Reset
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant={soundOn ? 'default' : 'outline'}
-          onClick={() => setSoundOn((s) => !s)}
-          className="pointer-events-auto h-7 px-2 text-[0.65rem] bg-white/85 backdrop-blur"
-        >
-          {soundOn ? '🔊' : '🔇'}
-        </Button>
-      </div>
     </div>
   );
 
@@ -1172,29 +1152,53 @@ export default function Home() {
               </div>
             )}
             <div className="w-full flex justify-center gap-3">
-              <nav
-                className="flex flex-col gap-2.5 p-2.5 bg-stone-100 rounded-2xl self-start mt-3 shadow-inner"
-                aria-label="Game mode"
-              >
-                {visibleModes.map((m) => (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => guardedChangeMode(m.key)}
-                    className={`flex items-center gap-2.5 px-4 py-3 text-sm font-semibold rounded-xl whitespace-nowrap transition ${
-                      mode === m.key
-                        ? `${m.active} ring-1 shadow-sm`
-                        : 'bg-white/60 text-stone-500 hover:text-stone-700 hover:bg-white'
-                    }`}
+              <div className="flex flex-col self-stretch mt-3 gap-2">
+                <nav
+                  className="flex flex-col gap-2.5 p-2.5 bg-stone-100 rounded-2xl shadow-inner"
+                  aria-label="Game mode"
+                >
+                  {visibleModes.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => guardedChangeMode(m.key)}
+                      className={`flex items-center gap-2.5 px-4 py-3 text-sm font-semibold rounded-xl whitespace-nowrap transition ${
+                        mode === m.key
+                          ? `${m.active} ring-1 shadow-sm`
+                          : 'bg-white/60 text-stone-500 hover:text-stone-700 hover:bg-white'
+                      }`}
+                    >
+                      <m.Icon className={`w-5 h-5 shrink-0 ${mode === m.key ? m.icon : 'text-stone-400'}`} />
+                      {m.label}
+                      {m.turbo && (
+                        <span className="text-amber-500" style={{ fontSize: '1rem', lineHeight: 0 }}> ⚡</span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
+                <div className="flex flex-col gap-1.5 mt-auto">
+                  {mode !== 'online' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={resetLocal}
+                      className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset game
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant={soundOn ? 'default' : 'outline'}
+                    onClick={() => setSoundOn((s) => !s)}
+                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur justify-start gap-2"
                   >
-                    <m.Icon className={`w-5 h-5 shrink-0 ${mode === m.key ? m.icon : 'text-stone-400'}`} />
-                    {m.label}
-                    {m.turbo && (
-                      <span className="text-amber-500" style={{ fontSize: '1rem', lineHeight: 0 }}> ⚡</span>
-                    )}
-                  </button>
-                ))}
-              </nav>
+                    {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                    Sound
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-col items-center min-w-0">
                 {state ? (
                   !spectator ? (
@@ -1209,13 +1213,16 @@ export default function Home() {
               {state && (
                 <div className="flex flex-col justify-between self-stretch py-3">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex flex-col items-center gap-2">
                     <span
-                      className={`w-2.5 h-2.5 rounded-full animate-pulse ${
-                        turn === 'w' ? 'bg-white ring-1 ring-stone-400' : 'bg-stone-900'
+                      className={`w-3.5 h-3.5 rounded-full animate-pulse ${
+                        turn === 'w' ? 'bg-white ring-2 ring-rose-500' : 'bg-stone-900 ring-2 ring-rose-500'
                       }`}
                     />
-                    <p className="text-[0.7rem] font-semibold text-stone-600 text-center leading-tight whitespace-nowrap">
+                    <p
+                      key={statusText + turn}
+                      className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
+                    >
                       {statusText}
                     </p>
                   </div>
