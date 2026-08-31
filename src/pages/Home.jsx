@@ -67,7 +67,7 @@ function fmtTime(s) {
 }
 
 export default function Home() {
-  const [mode, setMode] = useState('local'); // 'local' | 'computer' | 'online'
+  const [mode, setMode] = useState('computer'); // 'local' | 'computer' | 'online'
 
   // local / computer
   const [localState, setLocalState] = useState(initialState);
@@ -1178,6 +1178,41 @@ export default function Home() {
                 </nav>
                 <div className="flex flex-col gap-1.5 mt-auto mb-8">
                   {mode !== 'online' && (
+                    <select
+                      value={timeControl}
+                      onChange={(e) => setTimeControl(e.target.value)}
+                      className="h-8 px-2 text-xs rounded-lg border border-stone-300 bg-white/90 backdrop-blur text-stone-700"
+                    >
+                      {Object.keys(TIME_CONTROLS).map((k) => (
+                        <option key={k} value={k}>
+                          {TIME_CONTROLS[k].label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {(mode === 'local' || mode === 'computer') && !gameOver && (
+                    <div className="flex gap-1.5">
+                      {mode === 'local' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={offerDraw}
+                          className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 flex-1"
+                        >
+                          Draw
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={resign}
+                        className="h-8 px-2 text-xs bg-white/90 backdrop-blur border-stone-300 flex-1"
+                      >
+                        Resign
+                      </Button>
+                    </div>
+                  )}
+                  {mode !== 'online' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1276,22 +1311,6 @@ export default function Home() {
                   ⚡ Upgrade to Pro
                 </button>
               )}
-              {mode !== 'online' && (
-                <div>
-                  <p className="text-[0.65rem] uppercase tracking-widest text-stone-400 mb-1">Time control</p>
-                  <select
-                    value={timeControl}
-                    onChange={(e) => setTimeControl(e.target.value)}
-                    className="w-full text-sm rounded-lg border border-stone-200 bg-white px-2 py-1.5"
-                  >
-                    {Object.keys(TIME_CONTROLS).map((k) => (
-                      <option key={k} value={k}>
-                        {TIME_CONTROLS[k].label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant="outline" onClick={() => setFlipped((f) => !f)}>
                   Flip board
@@ -1308,16 +1327,6 @@ export default function Home() {
                 {humanToMove && (
                   <Button size="sm" variant="outline" onClick={showHint} disabled={hintLoading}>
                     {hintLoading ? 'Thinking…' : 'Hint'}
-                  </Button>
-                )}
-                {(mode === 'local' || mode === 'computer') && !gameOver && (
-                  <Button size="sm" variant="outline" onClick={resign}>
-                    Resign
-                  </Button>
-                )}
-                {mode === 'local' && !gameOver && (
-                  <Button size="sm" variant="outline" onClick={offerDraw}>
-                    Draw
                   </Button>
                 )}
               </div>
