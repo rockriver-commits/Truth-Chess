@@ -426,6 +426,13 @@ export default function Home() {
     kingOnlySinceRef.current = null;
   }
 
+  // In online mode, "Reset game" leaves the current match and immediately
+  // matchmakes a fresh one.
+  async function resetOnline() {
+    await leaveOnline();
+    quickMatch();
+  }
+
   function changeMode(m) {
     leaveOnline();
     setMode(m);
@@ -1205,7 +1212,7 @@ export default function Home() {
                       ))}
                     </select>
                   </div>
-                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame?.status === 'active' && !spectator && myColor)) && (
+                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame && !spectator && myColor)) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1215,7 +1222,7 @@ export default function Home() {
                       Draw
                     </Button>
                   )}
-                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame?.status === 'active' && !spectator && myColor)) && (
+                  {(((mode === 'local' || mode === 'computer') && !gameOver) || (mode === 'online' && onlineGame && !spectator && myColor)) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1225,17 +1232,15 @@ export default function Home() {
                       Resign
                     </Button>
                   )}
-                  {mode !== 'online' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={resetLocal}
-                      className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Reset game
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={mode === 'online' ? resetOnline : resetLocal}
+                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset game
+                  </Button>
                   <Button
                     size="sm"
                     variant={soundOn ? 'default' : 'outline'}
