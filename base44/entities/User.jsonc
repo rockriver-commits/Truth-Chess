@@ -16,6 +16,11 @@
         "pro"
       ],
       "default": "free"
+    },
+    "games_played": {
+      "type": "number",
+      "description": "Completed games by this user, used for the 55-game free trial.",
+      "default": 0
     }
   },
   "required": [

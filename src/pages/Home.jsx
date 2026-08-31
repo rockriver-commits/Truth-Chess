@@ -31,6 +31,8 @@ import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
+import EmailListPanel from '@/components/EmailListPanel';
+import RegisterToPlayCard from '@/components/RegisterToPlayCard';
 import { loadAdSense } from '@/lib/adsense';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
@@ -52,6 +54,10 @@ const TIME_CONTROLS = {
   '10+0': { label: '10+0 Rapid', initial: 600, inc: 0 },
   '15+10': { label: '15+10', initial: 900, inc: 10 },
 };
+
+// Free trial: every new player gets all modes for their first 55 games, then
+// the Pro paywall applies.
+const TRIAL_GAMES = 55;
 
 function fmtTime(s) {
   const m = Math.floor(s / 60);
@@ -78,6 +84,7 @@ export default function Home() {
   // localMoves.length, so it stays aligned with actual play.
   const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
   const recordedRef = useRef(false);
+  const countedRef = useRef(false);
   const kingOnlySinceRef = useRef(null);
 
   // batch-1 additions
@@ -111,6 +118,7 @@ export default function Home() {
 
   // online
   const [me, setMe] = useState(null);
+  const [meLoaded, setMeLoaded] = useState(false);
   const [onlineGame, setOnlineGame] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
@@ -120,7 +128,9 @@ export default function Home() {
   const [spectator, setSpectator] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setMe).catch(() => setMe(null));
+    base44.auth.me()
+      .then((u) => { setMe(u); setMeLoaded(true); })
+      .catch(() => { setMe(null); setMeLoaded(true); });
   }, []);
 
   // Load the shared, server-backed mate book so the AI recalls checkmates
@@ -135,15 +145,21 @@ export default function Home() {
   useEffect(() => loadAdSense(), []);
 
   const isPro = me?.plan === 'pro';
+  const gamesPlayed = me?.games_played || 0;
+  const trialActive = !!me && gamesPlayed < TRIAL_GAMES;
+  // Free trial: everyone gets all modes for their first 55 games, then the Pro
+  // paywall applies. Admins and Pro subscribers always have full access.
+  const hasAccess = isPro || me?.role === 'admin' || trialActive;
+  const gamesRemaining = Math.max(0, TRIAL_GAMES - gamesPlayed);
   // Base44 Payments can't sell digital subscriptions inside mobile app stores,
   // so the Pro upgrade path is only shown in browsers (web), not the native apps.
   const canUpgrade = !isMobileApp();
-  const visibleModes = MODES.filter((m) => !m.pro || isPro || canUpgrade);
+  const visibleModes = MODES.filter((m) => !m.pro || hasAccess || canUpgrade);
 
-  // Free users are capped at AI level 3; clamp if they lose Pro mid-session.
+  // Users without access are capped at AI level 3; clamp if they lose access.
   useEffect(() => {
-    if (!isPro && difficulty > 3) setDifficulty(3);
-  }, [isPro, difficulty]);
+    if (!hasAccess && difficulty > 3) setDifficulty(3);
+  }, [hasAccess, difficulty]);
 
   const onlineDerived = useMemo(() => {
     if (mode !== 'online' || !onlineGame) return null;
@@ -420,6 +436,7 @@ export default function Home() {
     setElapsed(0);
     openingRef.current = { book: null, wTarget: null, bTarget: null };
     recordedRef.current = false;
+    countedRef.current = false;
     kingOnlySinceRef.current = null;
   }
 
@@ -433,7 +450,7 @@ export default function Home() {
   // instead of switching. On mobile, where Pro can't be purchased, gated modes
   // are hidden from the selector entirely.
   function guardedChangeMode(m) {
-    if (MODES.find((x) => x.key === m)?.pro && !isPro) {
+    if (MODES.find((x) => x.key === m)?.pro && !hasAccess) {
       if (canUpgrade) setShowPro(true);
       return;
     }
@@ -455,7 +472,7 @@ export default function Home() {
   // Online play is a Pro feature. Free users are prompted to upgrade (web) or
   // see a locked message (mobile, where Pro can't be purchased).
   function requirePro() {
-    if (isPro) return true;
+    if (hasAccess) return true;
     setOnlineError(canUpgrade ? 'Pro feature — upgrade to unlock.' : 'Pro feature.');
     if (canUpgrade) setShowPro(true);
     return false;
@@ -973,6 +990,23 @@ export default function Home() {
     }
   }, [mode, gameOver, status, threefold, positionList, localMoves.length]);
 
+  // Free-trial game counter: when a game the player participates in ends, bump
+  // their server-side games_played so the 55-game trial advances. Exhibition
+  // (AI vs AI) and spectating don't count.
+  useEffect(() => {
+    if (!gameOver) { countedRef.current = false; return; }
+    if (countedRef.current) return;
+    const isParticipant =
+      mode === 'local' || mode === 'computer' || (mode === 'online' && !spectator);
+    if (!isParticipant || !me) return;
+    countedRef.current = true;
+    const next = (me.games_played || 0) + 1;
+    base44.auth.updateMe({ games_played: next })
+      .then((u) => setMe(u))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, gameOver, spectator, me]);
+
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));
     setPendingAdvance(false);
@@ -1083,6 +1117,13 @@ export default function Home() {
           </p>
         </header>
 
+        {!meLoaded ? (
+          <div className="flex justify-center py-24">
+            <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
+          </div>
+        ) : !me ? (
+          <RegisterToPlayCard />
+        ) : (
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
             <div className="w-full max-w-[620px] mb-3 space-y-2">
@@ -1155,15 +1196,16 @@ export default function Home() {
                 </div>
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
-                {isPro && <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />}
-                {!isPro && canUpgrade && (
+                {hasAccess ? (
+                  <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
+                ) : canUpgrade ? (
                   <ShareMoves
                     sans={moveSanDisplay}
                     resultStr={resultStr}
                     locked
                     onLocked={() => setShowPro(true)}
                   />
-                )}
+                ) : null}
                 {gameOver && positionList.length > 1 && (
                   <ReplayBar
                     index={reviewIdx}
@@ -1193,10 +1235,10 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
                 <span className="text-xs font-medium text-amber-600">
-                  {isPro ? '⚡ Pro' : ''}
+                  {isPro ? '⚡ Pro' : me?.role === 'admin' ? '⚡ Admin' : hasAccess ? `Trial · ${gamesRemaining} left` : ''}
                 </span>
               </div>
-              {!isPro && canUpgrade && (
+              {!hasAccess && canUpgrade && (
                 <button
                   type="button"
                   onClick={() => setShowPro(true)}
@@ -1260,19 +1302,19 @@ export default function Home() {
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-xs uppercase tracking-widest text-stone-400">Difficulty</p>
                       <span className="text-xs font-semibold text-stone-700">
-                        Level {difficulty}/{isPro ? 8 : 3}
+                        Level {difficulty}/{hasAccess ? 8 : 3}
                       </span>
                     </div>
                     <input
                       type="range"
                       min={1}
-                      max={isPro ? 8 : 3}
+                      max={hasAccess ? 8 : 3}
                       step={1}
                       value={difficulty}
                       onChange={(e) => setDifficulty(Number(e.target.value))}
                       className="w-full accent-amber-600"
                     />
-                    {!isPro && canUpgrade && (
+                    {!hasAccess && canUpgrade && (
                       <button
                         type="button"
                         onClick={() => setShowPro(true)}
@@ -1354,11 +1396,13 @@ export default function Home() {
             )}
           </aside>
         </div>
+        )}
 
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
           <TruthGuide />
+          {me?.role === 'admin' && <EmailListPanel />}
         </div>
       </div>
 
