@@ -1366,9 +1366,7 @@ export default function Home() {
               </div>
               <div className="order-first sm:order-none flex flex-col items-center min-w-0 flex-1 w-full">
                 {state ? (
-                  !spectator ? (
-                    <div className="my-3 w-full flex justify-center">{boardEl}</div>
-                  ) : null
+                  <div className="my-3 w-full flex justify-center">{boardEl}</div>
                 ) : (
                   <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
                     Create or join an online game to start playing
