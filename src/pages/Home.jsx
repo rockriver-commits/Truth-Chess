@@ -43,10 +43,10 @@ const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: 
 // hidden on mobile (where Pro can't be purchased). vs Computer and AI vs AI
 // are always free.
 const MODES = [
-  { key: 'local', label: '2 Players', pro: true, Icon: Users },
-  { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer },
-  { key: 'online', label: 'Online', pro: true, Icon: Globe },
-  { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true, Icon: Bot },
+  { key: 'local', label: '2 Players', pro: true, Icon: Users, active: 'bg-sky-100 text-sky-700 ring-sky-300', icon: 'text-sky-500' },
+  { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer, active: 'bg-emerald-100 text-emerald-700 ring-emerald-300', icon: 'text-emerald-500' },
+  { key: 'online', label: 'Online', pro: true, Icon: Globe, active: 'bg-violet-100 text-violet-700 ring-violet-300', icon: 'text-violet-500' },
+  { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true, Icon: Bot, active: 'bg-amber-100 text-amber-700 ring-amber-300', icon: 'text-amber-500' },
 ];
 
 const TIME_CONTROLS = {
@@ -1126,7 +1126,7 @@ export default function Home() {
             )}
             <div className="w-full flex justify-center gap-3">
               <nav
-                className="flex flex-col gap-2 p-2 bg-stone-100 rounded-xl self-start mt-3"
+                className="flex flex-col gap-2.5 p-2.5 bg-stone-100 rounded-2xl self-start mt-3 shadow-inner"
                 aria-label="Game mode"
               >
                 {visibleModes.map((m) => (
@@ -1134,14 +1134,16 @@ export default function Home() {
                     key={m.key}
                     type="button"
                     onClick={() => guardedChangeMode(m.key)}
-                    className={`flex items-center gap-2 px-3 py-2 text-[0.7rem] font-medium rounded-lg whitespace-nowrap transition ${
-                      mode === m.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500 hover:text-stone-700'
+                    className={`flex items-center gap-2.5 px-4 py-3 text-sm font-semibold rounded-xl whitespace-nowrap transition ${
+                      mode === m.key
+                        ? `${m.active} ring-1 shadow-sm`
+                        : 'bg-white/60 text-stone-500 hover:text-stone-700 hover:bg-white'
                     }`}
                   >
-                    <m.Icon className="w-4 h-4 shrink-0" />
+                    <m.Icon className={`w-5 h-5 shrink-0 ${mode === m.key ? m.icon : 'text-stone-400'}`} />
                     {m.label}
                     {m.turbo && (
-                      <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}> ⚡</span>
+                      <span className="text-amber-500" style={{ fontSize: '1rem', lineHeight: 0 }}> ⚡</span>
                     )}
                   </button>
                 ))}
