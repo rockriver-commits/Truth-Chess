@@ -1,11 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import TruthGuide from '@/components/TruthGuide';
-import { loadAdSense } from '@/lib/adsense';
 
 export default function Learn() {
-  // Ads load only on this content page and are removed on unmount.
-  useEffect(() => loadAdSense(), []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">

@@ -1,4 +1,6 @@
 import { Toaster } from "@/components/ui/toaster"
+import { useEffect } from 'react';
+import { loadAdSense } from '@/lib/adsense';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
@@ -58,6 +60,11 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  // Load the Google AdSense publisher script once at the app root so it stays
+  // present on every page (required for AdSense to crawl and approve the site).
+  useEffect(() => {
+    loadAdSense();
+  }, []);
 
   return (
     <AuthProvider>

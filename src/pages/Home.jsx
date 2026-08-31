@@ -42,7 +42,6 @@ import ResignFlowBanner from '@/components/ResignFlowBanner';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
-import { loadAdSense } from '@/lib/adsense';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 
@@ -242,9 +241,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The game page carries substantial written content (the TruthGuide section
-  // below the board), so AdSense is loaded here too. Removed on unmount.
-  useEffect(() => loadAdSense(), []);
+
 
   // Truth Chess is free for everyone — no paywall. All modes and AI levels are open.
   const hasAccess = true;
