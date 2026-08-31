@@ -1077,7 +1077,7 @@ export default function Home() {
   // The board itself, shared between the in-flow (player) layout and the
   // sticky (spectator) layout so the ChessBoard props stay in one place.
   const boardEl = (
-    <div className="relative w-full" style={{ maxWidth: 'min(820px, calc((100vh - 310px) * 10 / 9))' }}>
+    <div className="relative w-full max-w-[900px]">
       <ChessBoard
         board={viewState.board}
         selected={reviewing ? null : selected}
