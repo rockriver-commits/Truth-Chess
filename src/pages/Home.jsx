@@ -1103,8 +1103,14 @@ export default function Home() {
             height is the full page) so position:sticky holds for the whole
             scroll and everything else moves beneath it. */}
         {spectator && state && (
-          <div className="sticky top-0 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-stone-100 via-stone-100 to-stone-100/95 backdrop-blur-sm flex justify-center">
+          <div className="sticky top-0 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-stone-100 via-stone-100 to-stone-100/95 backdrop-blur-sm flex justify-center items-center gap-3">
             {boardEl}
+            <p
+              key={statusText + turn}
+              className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
+            >
+              {statusText}
+            </p>
           </div>
         )}
         <header className="relative mb-8">
@@ -1274,18 +1280,18 @@ export default function Home() {
                     Create or join an online game to start playing
                   </div>
                 )}
-                {state && (
-                  <p
-                    key={statusText + turn}
-                    className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash mb-2"
-                  >
-                    {statusText}
-                  </p>
-                )}
               </div>
               {state && (
                 <div className="flex flex-col justify-between self-stretch py-3 gap-4">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                  {!spectator && (
+                    <p
+                      key={statusText + turn}
+                      className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
+                    >
+                      {statusText}
+                    </p>
+                  )}
                   <CapturedSide pieces={viewCaptured.w} label="White captured" />
                 </div>
               )}
