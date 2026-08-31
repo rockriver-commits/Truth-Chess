@@ -21,16 +21,6 @@
       "type": "number",
       "description": "Completed games by this user.",
       "default": 0
-    },
-    "bonus_games": {
-      "type": "number",
-      "description": "Achievement points earned by beating the computer / first mate of the day.",
-      "default": 0
-    },
-    "last_mate_date": {
-      "type": "string",
-      "description": "Local date (YYYY-MM-DD) of the player's last checkmate win, for the first-mate-of-the-day reward.",
-      "default": ""
     }
   },
   "required": [

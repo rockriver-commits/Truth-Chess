@@ -85,7 +85,6 @@ export default function Home() {
   // localMoves.length, so it stays aligned with actual play.
   const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
   const recordedRef = useRef(false);
-  const countedRef = useRef(false);
   const kingOnlySinceRef = useRef(null);
 
   // batch-1 additions
@@ -146,10 +145,7 @@ export default function Home() {
   // below the board), so AdSense is loaded here too. Removed on unmount.
   useEffect(() => loadAdSense(), []);
 
-  const bonusGames = me?.bonus_games || 0;
-  // Truth Chess is free for everyone — no paywall. All modes and AI levels are
-  // open. bonus_games is a fun achievement counter (beat the computer / first
-  // mate of the day), shown as a badge.
+  // Truth Chess is free for everyone — no paywall. All modes and AI levels are open.
   const hasAccess = true;
   const canUpgrade = false;
   const visibleModes = MODES;
@@ -429,7 +425,6 @@ export default function Home() {
     setElapsed(0);
     openingRef.current = { book: null, wTarget: null, bTarget: null };
     recordedRef.current = false;
-    countedRef.current = false;
     kingOnlySinceRef.current = null;
   }
 
@@ -998,44 +993,6 @@ export default function Home() {
     }
   }, [mode, gameOver, status, threefold, positionList, localMoves.length]);
 
-  // Free-trial game counter: when a game the player participates in ends, bump
-  // their server-side games_played so the 55-game trial advances. Exhibition
-  // (AI vs AI) and spectating don't count.
-  useEffect(() => {
-    if (!gameOver) { countedRef.current = false; return; }
-    if (countedRef.current) return;
-    const isParticipant =
-      mode === 'local' || mode === 'computer' || (mode === 'online' && !spectator);
-    if (!isParticipant || !me) return;
-    countedRef.current = true;
-    const today = new Date().toLocaleDateString('en-CA');
-    // Did the player deliver checkmate this game?
-    const playerWon = status === 'checkmate' && (
-      mode === 'local' ||
-      (mode === 'computer' && turn === 'b') ||
-      (mode === 'online' && !spectator && myColor &&
-        ((myColor === 'w' && turn === 'b') || (myColor === 'b' && turn === 'w')))
-    );
-    const beatComputer = mode === 'computer' && status === 'checkmate' && turn === 'b';
-    const firstMateOfDay = playerWon && (me.last_mate_date || '') !== today;
-    let bonusDelta = 0;
-    if (beatComputer) {
-      bonusDelta += 1;
-      toast({ title: '🏆 You beat the computer!', description: '+1 to your score.' });
-    }
-    if (firstMateOfDay) {
-      bonusDelta += 1;
-      toast({ title: '🥇 First mate of the day!', description: 'Nice win — +1 to your score.' });
-    }
-    const patch = { games_played: (me.games_played || 0) + 1 };
-    if (bonusDelta > 0) patch.bonus_games = (me.bonus_games || 0) + bonusDelta;
-    if (firstMateOfDay) patch.last_mate_date = today;
-    base44.auth.updateMe(patch)
-      .then((u) => setMe(u))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gameOver, spectator, me, status, turn, myColor]);
-
   function advance() {
     setDifficulty((d) => Math.min(8, d + 1));
     setPendingAdvance(false);
@@ -1273,7 +1230,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-widest text-stone-400">Game</span>
                 <span className="text-xs font-medium text-amber-600">
-                  {me?.role === 'admin' ? '⚡ Admin' : bonusGames ? `🏆 ${bonusGames}` : ''}
+                  {me?.role === 'admin' ? '⚡ Admin' : ''}
                 </span>
               </div>
               {!hasAccess && canUpgrade && (
