@@ -412,15 +412,33 @@ function pawnAttackProgress(board, hunter, targetType) {
   return total;
 }
 
-// --- Move ordering (MVV-LVA for captures, promotions high) -----------------
-function orderMoves(moves) {
+// --- Move ordering --------------------------------------------------------
+// Captures/promotions first (MVV-LVA), then the TT move, killer moves, and a
+// history table for quiet moves — the classic ordering that lets alpha-beta
+// prune aggressively and powers late-move reductions.
+const MAX_PLY = 64;
+let killers = [];
+let historyTab = new Int32Array(FILES * RANKS * FILES * RANKS);
+
+function sameMove(a, b) {
+  return a && b && a.from[0] === b.from[0] && a.from[1] === b.from[1]
+    && a.to[0] === b.to[0] && a.to[1] === b.to[1];
+}
+function histIdx(m) {
+  return (m.from[0] * FILES + m.from[1]) * (FILES * RANKS) + (m.to[0] * FILES + m.to[1]);
+}
+function scoreMove(m, ply, ttMove) {
+  if (m === ttMove) return 1e9;
+  if (m.captured) return 100000 + VALUES[m.captured.type] * 100 - (VALUES[m.piece.type] || 0);
+  if (m.promotion) return 90000;
+  const k = killers[ply] || [null, null];
+  if (k[0] && sameMove(m, k[0])) return 80000;
+  if (k[1] && sameMove(m, k[1])) return 79000;
+  return historyTab[histIdx(m)] || 0;
+}
+function orderMoves(moves, ply = 0, ttMove = null) {
   return moves
-    .map((m) => {
-      let s = 0;
-      if (m.captured) s = 10000 + VALUES[m.captured.type] * 10 - (VALUES[m.piece.type] || 0);
-      if (m.promotion) s += 9000;
-      return { m, s };
-    })
+    .map((m) => ({ m, s: scoreMove(m, ply, ttMove) }))
     .sort((a, b) => b.s - a.s)
     .map((x) => x.m);
 }
@@ -469,6 +487,18 @@ function quiesce(state, color, alpha, beta, qsPly = 0) {
   return alpha;
 }
 
+// A side has "non-pawn material" if it owns at least one piece that can move
+// freely (N/B/R/Q/T) — used to avoid null-move zugzwang in bare K+P endings.
+function hasNonPawnMaterial(state, color) {
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = state.board[r][f];
+      if (p && p.color === color && p.type !== 'P' && p.type !== 'K') return true;
+    }
+  }
+  return false;
+}
+
 function negamax(state, color, depth, alpha, beta, ply) {
   if (now() > deadline) { timedOut = true; return alpha; }
   const key = hashState(state.board, state.turn);
@@ -489,19 +519,42 @@ function negamax(state, color, depth, alpha, beta, ply) {
       ? quiesce(state, color, alpha, beta)
       : evaluate(state.board) * (color === 'w' ? 1 : -1);
   }
-  const ordered = orderMoves(moves);
-  if (ttMove) ordered.unshift(ttMove);
+  const opp = color === 'w' ? 'b' : 'w';
+  const checked = inCheck(state, color);
+
+  // Null-move pruning: when not in check and with material to spare, pass the
+  // turn at reduced depth — if the opponent still can't beat beta, prune the
+  // whole node. Skipped at the root (ply 0) and in bare K/P endings.
+  if (!checked && depth >= 3 && ply > 0 && hasNonPawnMaterial(state, color)) {
+    const nullState = { ...state, turn: opp, ep: null };
+    const R = 2;
+    const nullScore = -negamax(nullState, opp, depth - 1 - R, -beta, -beta + 1, ply + 1);
+    if (timedOut) return alpha;
+    if (nullScore >= beta) return beta;
+  }
+
+  const ordered = orderMoves(moves, ply, ttMove);
   let best = -Infinity;
   let bestMove = null;
   let flag = FLAG.UPPER;
-  const opp = color === 'w' ? 'b' : 'w';
+  let searched = 0;
   for (const m of ordered) {
     const ns = makeMove(state, m);
     // Check extension: a checking move gets +1 ply so forcing mate sequences
     // are found within the depth budget.
     const givesCheck = inCheck(ns, opp);
     const ext = givesCheck && ply < 40 ? 1 : 0;
-    let sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
+    const isQuiet = !m.captured && !m.promotion && m !== ttMove;
+    // Late-move reductions: quiet moves searched late get a shallower look,
+    // with a full re-search if they surprisingly beat alpha.
+    const lmr = isQuiet && depth >= 3 && searched >= 3 && !givesCheck ? 1 : 0;
+    let sc;
+    if (lmr) {
+      sc = -negamax(ns, opp, depth - 1 + ext - 1, -alpha - 1, -alpha, ply + 1);
+      if (!timedOut && sc > alpha) sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
+    } else {
+      sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
+    }
     if (timedOut) break;
     if (givesCheck) {
       if (isHangingCheck(ns.board, m, color)) sc -= VALUES[m.promotion ? 'Q' : m.piece.type];
@@ -509,7 +562,18 @@ function negamax(state, color, depth, alpha, beta, ply) {
     }
     if (sc > best) { best = sc; bestMove = m; }
     if (best > alpha) { alpha = best; flag = FLAG.EXACT; }
-    if (alpha >= beta) { flag = FLAG.LOWER; break; }
+    if (alpha >= beta) {
+      flag = FLAG.LOWER;
+      // Record quiet cutoffs as killers + history so sibling nodes try them
+      // earlier — the ordering that makes alpha-beta prune hardest.
+      if (isQuiet) {
+        const k = killers[ply] || (killers[ply] = [null, null]);
+        if (!sameMove(m, k[0])) { k[1] = k[0]; k[0] = m; }
+        historyTab[histIdx(m)] += depth * depth;
+      }
+      break;
+    }
+    searched++;
   }
   if (!timedOut && bestMove) {
     TT.set(key, { depth, score: best, flag, best: bestMove });
@@ -552,6 +616,8 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   deadline = now() + cfg.timeMs;
   timedOut = false;
   TT.clear();
+  killers = Array.from({ length: MAX_PLY + 8 }, () => [null, null]);
+  historyTab = new Int32Array(FILES * RANKS * FILES * RANKS);
 
   const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
