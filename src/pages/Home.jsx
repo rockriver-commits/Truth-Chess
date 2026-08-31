@@ -34,6 +34,8 @@ import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
 import EmailListPanel from '@/components/EmailListPanel';
 import { loadAdSense } from '@/lib/adsense';
+import { Users, Computer, Globe, Bot } from 'lucide-react';
+import CapturedSide from '@/components/CapturedSide';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -41,10 +43,10 @@ const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: 
 // hidden on mobile (where Pro can't be purchased). vs Computer and AI vs AI
 // are always free.
 const MODES = [
-  { key: 'local', label: '2 Players', pro: true },
-  { key: 'computer', label: 'vs Computer', pro: false },
-  { key: 'online', label: 'Online', pro: true },
-  { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true },
+  { key: 'local', label: '2 Players', pro: true, Icon: Users },
+  { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer },
+  { key: 'online', label: 'Online', pro: true, Icon: Globe },
+  { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true, Icon: Bot },
 ];
 
 const TIME_CONTROLS = {
@@ -1112,9 +1114,19 @@ export default function Home() {
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8 items-start">
           <div className="flex flex-col items-center">
-            <div className="w-full flex justify-center gap-4">
+            {state && mode !== 'online' && timeControl !== 'unlimited' && (
+              <div className="w-full max-w-[540px] mb-2">
+                <ClockBar
+                  whiteClock={whiteClock}
+                  blackClock={blackClock}
+                  active={gameOver ? null : turn}
+                  flipped={effectiveFlipped}
+                />
+              </div>
+            )}
+            <div className="w-full flex justify-center gap-3">
               <nav
-                className="flex flex-col gap-2 p-2 bg-stone-100 rounded-xl self-start"
+                className="flex flex-col gap-2 p-2 bg-stone-100 rounded-xl self-start mt-3"
                 aria-label="Game mode"
               >
                 {visibleModes.map((m) => (
@@ -1122,10 +1134,11 @@ export default function Home() {
                     key={m.key}
                     type="button"
                     onClick={() => guardedChangeMode(m.key)}
-                    className={`px-3 py-2 text-[0.7rem] font-medium rounded-lg whitespace-nowrap transition ${
+                    className={`flex items-center gap-2 px-3 py-2 text-[0.7rem] font-medium rounded-lg whitespace-nowrap transition ${
                       mode === m.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500 hover:text-stone-700'
                     }`}
                   >
+                    <m.Icon className="w-4 h-4 shrink-0" />
                     {m.label}
                     {m.turbo && (
                       <span className="text-amber-500" style={{ fontSize: '0.95rem', lineHeight: 0 }}> ⚡</span>
@@ -1133,22 +1146,26 @@ export default function Home() {
                   </button>
                 ))}
               </nav>
-              <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center min-w-0">
+                {state ? (
+                  !spectator ? (
+                    <div className="my-3 w-full flex justify-center">{boardEl}</div>
+                  ) : null
+                ) : (
+                  <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
+                    Create or join an online game to start playing
+                  </div>
+                )}
+              </div>
+              {state && (
+                <div className="flex flex-col gap-2 self-start mt-3">
+                  <CapturedSide pieces={viewCaptured.w} label="White captured" />
+                  <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                </div>
+              )}
+            </div>
             {state ? (
               <>
-                {mode !== 'online' && timeControl !== 'unlimited' && (
-                  <ClockBar
-                    whiteClock={whiteClock}
-                    blackClock={blackClock}
-                    active={gameOver ? null : turn}
-                    flipped={effectiveFlipped}
-                  />
-                )}
-                <CapturedRow pieces={viewCaptured.w} label="White has captured" />
-                {!spectator && (
-                  <div className="my-3 w-full flex justify-center">{boardEl}</div>
-                )}
-                <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
                 <div className="w-full max-w-[540px] mx-auto mt-1 flex items-center justify-between gap-3">
                   <p
                     className={`text-base font-medium ${
@@ -1208,13 +1225,7 @@ export default function Home() {
                   />
                 )}
               </>
-            ) : (
-              <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
-                Create or join an online game to start playing
-              </div>
-            )}
-              </div>
-            </div>
+            ) : null}
           </div>
 
           <aside className="space-y-5">
@@ -1467,29 +1478,6 @@ export default function Home() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function CapturedRow({ pieces, label }) {
-  return (
-    <div className="w-full max-w-[540px] mx-auto h-7 flex items-center gap-1 px-1">
-      <span className="text-[0.65rem] uppercase tracking-widest text-stone-400 mr-1 hidden sm:inline">
-        {label}
-      </span>
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          className="leading-none"
-          style={{
-            fontSize: '1.1rem',
-            color: p.color === 'w' ? '#cbd5e1' : '#475569',
-            textShadow: p.color === 'w' ? '0 0 1px rgba(0,0,0,0.6)' : 'none',
-          }}
-        >
-          {GLYPHS[p.type]}
-        </span>
-      ))}
     </div>
   );
 }
