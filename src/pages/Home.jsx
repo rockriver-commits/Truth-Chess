@@ -1273,18 +1273,18 @@ export default function Home() {
                     Create or join an online game to start playing
                   </div>
                 )}
+                {state && (
+                  <p
+                    key={statusText + turn}
+                    className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash mb-2"
+                  >
+                    {statusText}
+                  </p>
+                )}
               </div>
               {state && (
-                <div className="flex flex-col justify-between self-stretch py-3">
+                <div className="flex flex-col justify-between self-stretch py-3 gap-4">
                   <CapturedSide pieces={viewCaptured.b} label="Black captured" />
-                  <div className="flex flex-col items-center">
-                    <p
-                      key={statusText + turn}
-                      className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
-                    >
-                      {statusText}
-                    </p>
-                  </div>
                   <CapturedSide pieces={viewCaptured.w} label="White captured" />
                 </div>
               )}
@@ -1322,16 +1322,21 @@ export default function Home() {
             ) : null}
           </div>
 
+          <div className="flex justify-center">
+            <div className="w-full max-w-md">
+              <LobbyPanel
+                online={online}
+                openGames={openGames}
+                myIdentityId={identity.id}
+                onJoinGame={joinSpecific}
+              />
+            </div>
+          </div>
+
           <aside className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
             {me && !identity.player_name && (
               <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
             )}
-            <LobbyPanel
-              online={online}
-              openGames={openGames}
-              myIdentityId={identity.id}
-              onJoinGame={joinSpecific}
-            />
             {mode === 'online' && (
               <OnlinePanel
                 onlineGame={onlineGame}
