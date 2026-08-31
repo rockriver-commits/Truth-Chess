@@ -14,7 +14,7 @@ export default async function(req) {
 
     const nameById = new Map();
     for (const u of users) {
-      nameById.set(u.id, u.full_name || u.email || u.id);
+      nameById.set(u.id, u.player_name || 'Anonymous');
     }
 
     const GHOST = '__ghost__';

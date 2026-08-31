@@ -31,7 +31,6 @@ import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import TruthGuide from '@/components/TruthGuide';
-import EmailListPanel from '@/components/EmailListPanel';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
@@ -1467,7 +1466,6 @@ export default function Home() {
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
           <TruthGuide />
-          {me?.role === 'admin' && <EmailListPanel />}
         </div>
       </div>
 
