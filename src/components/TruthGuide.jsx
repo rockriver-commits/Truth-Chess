@@ -158,12 +158,12 @@ export default function TruthGuide() {
 
       <H2>Truth Chess openings — a starter repertoire</H2>
       <p className="mt-3 text-stone-600 leading-relaxed">
-        The Veritas engine plays from a repertoire of twenty-three traditional openings adapted
-        to the 10×9 board. Below are six of the most instructive, each shown as the exact position
-        the engine reaches after its scripted opening moves. Files run a–j left to right; the
-        Queen stands on the e-file and the King on the f-file, with a Truth flanking each. Early
-        self-play data is still thin, but the queen's-pawn opening has been the strongest so far —
-        two wins and a draw from its first three recorded games.
+        The Truth piece reshapes opening play, so the strongest openings here are built around it.
+        Below are ten Truth Chess openings, split into <strong>offense</strong> openings — where a
+        Truth (or both) advances into an attacking post — and <strong>defense</strong> openings —
+        where a Truth moves to shield the king. Each diagram shows the exact position after the
+        opening's moves. Files run a–j left to right; the Queen stands on the e-file and the King
+        on the f-file, with a Truth flanking each.
       </p>
       <OpeningsGallery />
 
