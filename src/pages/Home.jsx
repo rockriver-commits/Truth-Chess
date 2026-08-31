@@ -42,9 +42,9 @@ const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: 
 // hidden on mobile (where Pro can't be purchased). vs Computer and AI vs AI
 // are always free.
 const MODES = [
-  { key: 'local', label: '2 Players', pro: true, Icon: Users, active: 'bg-sky-100 text-sky-700 ring-sky-300', icon: 'text-sky-500' },
-  { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer, active: 'bg-emerald-100 text-emerald-700 ring-emerald-300', icon: 'text-emerald-500' },
   { key: 'online', label: 'Online', pro: true, Icon: Globe, active: 'bg-violet-100 text-violet-700 ring-violet-300', icon: 'text-violet-500' },
+  { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer, active: 'bg-emerald-100 text-emerald-700 ring-emerald-300', icon: 'text-emerald-500' },
+  { key: 'local', label: '2 Players', pro: true, Icon: Users, active: 'bg-sky-100 text-sky-700 ring-sky-300', icon: 'text-sky-500' },
   { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true, Icon: Bot, active: 'bg-amber-100 text-amber-700 ring-amber-300', icon: 'text-amber-500' },
 ];
 
