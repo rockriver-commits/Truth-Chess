@@ -1037,9 +1037,39 @@ export default function Home() {
     return null;
   }, [status, turn, threefold, drawAgreed]);
 
+  // The board itself, shared between the in-flow (player) layout and the
+  // sticky (spectator) layout so the ChessBoard props stay in one place.
+  const boardEl = (
+    <div className="relative w-full max-w-[620px]">
+      <ChessBoard
+        board={viewState.board}
+        selected={reviewing ? null : selected}
+        legalMoves={reviewing ? [] : legalMoves}
+        lastMove={viewLastMove}
+        onSquareClick={handleSquareClick}
+        onDropMove={handleDropMove}
+        animateMove={animateMove}
+        flipped={effectiveFlipped}
+        checkSquare={viewCheck}
+        hintMove={reviewing ? null : hint}
+        boardTheme={boardTheme}
+        pieceStyle={pieceStyle}
+      />
+      {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-100 via-stone-50 to-amber-50/40">
       <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
+        {/* When spectating, pin the board to the top of the page wrapper (whose
+            height is the full page) so position:sticky holds for the whole
+            scroll and everything else moves beneath it. */}
+        {spectator && state && (
+          <div className="sticky top-0 z-30 py-2 -mx-4 px-4 bg-gradient-to-b from-stone-100 via-stone-100 to-stone-100/95 backdrop-blur-sm flex justify-center">
+            {boardEl}
+          </div>
+        )}
         <header className="text-center mb-8">
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600/80">
             A Chess Variant
@@ -1097,25 +1127,9 @@ export default function Home() {
                   />
                 )}
                 <CapturedRow pieces={viewCaptured.w} label="White has captured" />
-                <div className="my-3 w-full flex justify-center">
-                  <div className="relative w-full max-w-[620px]">
-                    <ChessBoard
-                      board={viewState.board}
-                      selected={reviewing ? null : selected}
-                      legalMoves={reviewing ? [] : legalMoves}
-                      lastMove={viewLastMove}
-                      onSquareClick={handleSquareClick}
-                      onDropMove={handleDropMove}
-                      animateMove={animateMove}
-                      flipped={effectiveFlipped}
-                      checkSquare={viewCheck}
-                      hintMove={reviewing ? null : hint}
-                      boardTheme={boardTheme}
-                      pieceStyle={pieceStyle}
-                    />
-                    {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
-                  </div>
-                </div>
+                {!spectator && (
+                  <div className="my-3 w-full flex justify-center">{boardEl}</div>
+                )}
                 <CapturedRow pieces={viewCaptured.b} label="Black has captured" />
                 <div className="w-full max-w-[620px] mx-auto mt-1 flex items-center justify-between gap-3">
                   <p
