@@ -12,12 +12,17 @@ export default async function(req) {
     const games = await base44.asServiceRole.entities.Game.list('-created_date', 1000);
     const users = await base44.asServiceRole.entities.User.list('-created_date', 1000);
 
+    const GHOST = '__ghost__';
+    const COMPUTER = '__computer__';
+
     const nameById = new Map();
     for (const u of users) {
       nameById.set(u.id, u.player_name || 'Anonymous');
     }
+    // The vs-Computer opponent is recorded under a synthetic player id; show
+    // it on the leaderboard as the engine's name instead of "Anonymous".
+    nameById.set(COMPUTER, 'Zveritas chess engine');
 
-    const GHOST = '__ghost__';
     const wins = new Map();
     const played = new Map();
 
