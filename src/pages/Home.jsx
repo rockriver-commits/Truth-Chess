@@ -1717,40 +1717,47 @@ export default function Home() {
               </div>
               <div className="order-first sm:order-none flex flex-col items-center min-w-0 flex-1 w-full">
                 {state ? (
-                  <div className="my-3 w-full flex flex-col sm:flex-row justify-center items-stretch gap-2">
-                    {boardEl}
-                    <div className="flex flex-col justify-between self-stretch gap-4 pb-5">
-                      <CapturedSide pieces={viewCaptured.b} label="Black captured" />
-                      {!spectator && (
-                        <p
-                          key={statusText + turn}
-                          className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
-                        >
-                          {statusText}
-                        </p>
-                      )}
-                      <CapturedSide pieces={viewCaptured.w} label="White captured" />
+                  <div className="my-3 w-full flex flex-col gap-2">
+                    <div className="w-full flex flex-col sm:flex-row justify-center items-stretch gap-2">
+                      {boardEl}
+                      <div className="flex flex-col justify-between self-stretch gap-4 pb-5 w-full sm:w-32 sm:shrink-0">
+                        <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                        {!spectator && (
+                          <p
+                            key={statusText + turn}
+                            className="text-sm font-bold text-center leading-tight animate-status-flash"
+                          >
+                            {statusText}
+                          </p>
+                        )}
+                        <CapturedSide pieces={viewCaptured.w} label="White captured" />
+                      </div>
                     </div>
+                    {state && gameOver && positionList.length > 1 && (
+                      <div className="w-full flex justify-center gap-2">
+                        <div className="w-full max-w-[600px] flex justify-center">
+                          <ReplayBar
+                            index={reviewIdx}
+                            total={positionList.length}
+                            onFirst={() => setReviewIdx(0)}
+                        onPrev={() =>
+                          setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
+                        }
+                        onNext={() =>
+                          setReviewIdx((i) => (i === null ? null : Math.min(positionList.length - 1, i + 1)))
+                        }
+                        onLast={() => setReviewIdx(positionList.length - 1)}
+                        onLive={() => setReviewIdx(null)}
+                      />
+                        </div>
+                        <div className="hidden sm:block w-32 shrink-0" aria-hidden="true" />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
                     Create or join an online game to start playing
                   </div>
-                )}
-                {state && gameOver && positionList.length > 1 && (
-                  <ReplayBar
-                    index={reviewIdx}
-                    total={positionList.length}
-                    onFirst={() => setReviewIdx(0)}
-                    onPrev={() =>
-                      setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
-                    }
-                    onNext={() =>
-                      setReviewIdx((i) => (i === null ? null : Math.min(positionList.length - 1, i + 1)))
-                    }
-                    onLast={() => setReviewIdx(positionList.length - 1)}
-                    onLive={() => setReviewIdx(null)}
-                  />
                 )}
               </div>
             </div>
