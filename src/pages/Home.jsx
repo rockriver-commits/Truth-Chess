@@ -1650,6 +1650,21 @@ export default function Home() {
                     Create or join an online game to start playing
                   </div>
                 )}
+                {state && gameOver && positionList.length > 1 && (
+                  <ReplayBar
+                    index={reviewIdx}
+                    total={positionList.length}
+                    onFirst={() => setReviewIdx(0)}
+                    onPrev={() =>
+                      setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
+                    }
+                    onNext={() =>
+                      setReviewIdx((i) => (i === null ? null : Math.min(positionList.length - 1, i + 1)))
+                    }
+                    onLast={() => setReviewIdx(positionList.length - 1)}
+                    onLive={() => setReviewIdx(null)}
+                  />
+                )}
               </div>
               {state && (
                 <div className="flex flex-col justify-between self-stretch py-3 gap-4">
@@ -1680,21 +1695,6 @@ export default function Home() {
                     onLocked={() => setShowPro(true)}
                   />
                 ) : null}
-                {gameOver && positionList.length > 1 && (
-                  <ReplayBar
-                    index={reviewIdx}
-                    total={positionList.length}
-                    onFirst={() => setReviewIdx(0)}
-                    onPrev={() =>
-                      setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
-                    }
-                    onNext={() =>
-                      setReviewIdx((i) => (i === null ? null : Math.min(positionList.length - 1, i + 1)))
-                    }
-                    onLast={() => setReviewIdx(positionList.length - 1)}
-                    onLive={() => setReviewIdx(null)}
-                  />
-                )}
               </>
             ) : null}
           </div>
