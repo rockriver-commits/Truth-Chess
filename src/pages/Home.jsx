@@ -1602,7 +1602,7 @@ export default function Home() {
               </div>
             )}
             <div className="w-full max-w-[920px] mx-auto flex flex-col sm:flex-row justify-center gap-2">
-              <div className="flex flex-col self-stretch sm:mt-3 gap-2">
+              <div className="flex flex-col self-start sm:mt-3 gap-2">
                 <nav
                   className="flex flex-col gap-2.5 p-2.5 bg-stone-100 rounded-2xl shadow-inner"
                   aria-label="Game mode"
@@ -1626,7 +1626,7 @@ export default function Home() {
                     </button>
                   ))}
                 </nav>
-                <div className="flex flex-col gap-1.5 mt-auto mb-8">
+                <div className="flex flex-col gap-1.5 mb-8">
                   <div className="flex flex-col gap-1">
                     <p className="text-[0.6rem] uppercase tracking-widest text-stone-400 px-1">Time Control</p>
                     <select
