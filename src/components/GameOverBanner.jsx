@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-// Flashy overlay shown over the board when a game ends in checkmate, stalemate,
-// or a draw. Pulsing scale + glowing text. pointer-events-none so it never
-// blocks the board underneath.
+// Overlay shown over the board when a game ends in checkmate, stalemate, or a
+// draw. Click anywhere on the banner to dismiss it and see the final board
+// clearly; it resets (reappears) when a new result comes in.
 export default function GameOverBanner({ title, subtitle }) {
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => { setDismissed(false); }, [title, subtitle]);
+  if (dismissed) return null;
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-none">
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center">
       <motion.div
-        className="px-4 py-2 rounded-xl bg-black/25 text-center"
+        onClick={() => setDismissed(true)}
+        className="px-4 py-2 rounded-xl bg-black/25 text-center cursor-pointer hover:bg-black/35 transition-colors"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: [1, 1.06, 1], opacity: 1 }}
         transition={{
@@ -32,6 +36,7 @@ export default function GameOverBanner({ title, subtitle }) {
         {subtitle && (
           <p className="mt-0.5 text-[0.7rem] font-medium text-white/70">{subtitle}</p>
         )}
+        <p className="mt-1 text-[0.6rem] font-medium text-white/50">tap to dismiss</p>
       </motion.div>
     </div>
   );

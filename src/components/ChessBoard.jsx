@@ -29,12 +29,15 @@ function Cross({ color }) {
 function Maiden({ color }) {
   const fill = color === 'w' ? '#f8fafc' : '#1f2937';
   const stroke = color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)';
+  const goldEdge = color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)';
   return (
     <svg
       viewBox="0 0 24 24"
       className="w-[68%] h-[68%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
+      {/* gold triangular pedestal the Maiden sits on */}
+      <polygon points="3.5,23 20.5,23 12,19.5" fill="#f5c518" stroke={goldEdge} strokeWidth="0.3" strokeLinejoin="round" />
       {/* long golden hair down the back, kept within shoulder width */}
       <path
         d="M9 5 C8.4 9 8.6 14 8.8 21 L15.2 21 C15.4 14 15.6 9 15 5 C14.2 6 9.8 6 9 5 Z"
