@@ -31,10 +31,11 @@ function KnightHorn({ color }) {
     <svg
       viewBox="0 0 24 24"
       className="absolute pointer-events-none"
-      style={{ left: '33%', top: '0.05em', transform: 'translateX(-50%) rotate(-30deg)', width: '0.42em', height: '0.24em' }}
+      style={{ left: '31%', top: '-0.31em', transform: 'translateX(-50%) rotate(-20deg)', width: '0.2em', height: '0.4em' }}
       aria-hidden="true"
     >
-      <polygon points="12,1 6,23 18,23" fill="#fbbf24" stroke={edge} strokeWidth="1.2" strokeLinejoin="round" />
+      <polygon points="12,1 8.5,23 15.5,23" fill="#fbbf24" stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
+      <polygon points="12,1 12,23 12.1,23" fill={edge} opacity="0.45" />
     </svg>
   );
 }
