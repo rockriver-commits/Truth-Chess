@@ -60,6 +60,7 @@ import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
+import MaidenHowTo from '@/components/MaidenHowTo';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -1851,7 +1852,7 @@ export default function Home() {
             )}
 
             {mode !== 'online' && (
-              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
+              maidenMode ? <MaidenHowTo /> : <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
                 <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
                 <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                   <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>

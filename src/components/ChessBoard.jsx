@@ -32,40 +32,33 @@ function Maiden({ color }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="w-[62%] h-[62%]"
+      className="w-[68%] h-[68%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
-      {/* long golden hair flowing down the back */}
+      {/* long golden hair down the back, kept within shoulder width */}
       <path
-        d="M9 4 C5 6 4 11 4.5 17 C4.7 20 4 22 3.5 23 L9 23 C9.5 18 10 13 10.5 8 Z"
+        d="M9 5 C8.4 9 8.6 14 8.8 21 L15.2 21 C15.4 14 15.6 9 15 5 C14.2 6 9.8 6 9 5 Z"
         fill="#f5c518"
         stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'}
         strokeWidth="0.3"
         opacity="0.95"
       />
+      {/* hourglass gown — shoulders, cinched waist, flared skirt */}
       <path
-        d="M15 4 C19 6 20 11 19.5 17 C19.3 20 20 22 20.5 23 L15 23 C14.5 18 14 13 13.5 8 Z"
-        fill="#f5c518"
-        stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'}
-        strokeWidth="0.3"
-        opacity="0.95"
-      />
-      {/* hourglass gown — bust, cinched waist, flared hips */}
-      <path
-        d="M9 8 C8 10 10 12 10.5 13 C10.5 14 9.5 15 9 17 C8.5 19 6.5 21 6 23 L18 23 C17.5 21 15.5 19 15 17 C14.5 15 13.5 14 13.5 13 C14 12 16 10 15 8 Z"
+        d="M8.5 8 C7.4 10.5 9.6 12.2 10.2 13.2 C10.2 14.2 9 15 8.5 17 C8 19.5 5.5 21 5 23 L19 23 C18.5 21 16 19.5 15.5 17 C15 15 13.8 14.2 13.8 13.2 C14.4 12.2 16.6 10.5 15.5 8 Z"
         fill={fill}
         stroke={stroke}
         strokeWidth="0.6"
         strokeLinejoin="round"
       />
       {/* bust shaping line */}
-      <path d="M9.4 9 C10 10.6 14 10.6 14.6 9" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.5" />
+      <path d="M8.8 9.2 C9.5 10.8 14.5 10.8 15.2 9.2" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.5" />
       {/* head */}
-      <circle cx="12" cy="5" r="2.6" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      <circle cx="12" cy="5" r="2.8" fill={fill} stroke={stroke} strokeWidth="0.6" />
       {/* golden hair crown over the head */}
-      <path d="M9.6 4.4 C9 2.6 11 1.6 12 1.6 C13 1.6 15 2.6 14.4 4.4 C13.5 3.5 10.5 3.5 9.6 4.4 Z" fill="#f5c518" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.25" />
+      <path d="M9.3 4.6 C8.8 2.5 11 1.5 12 1.5 C13 1.5 15.2 2.5 14.7 4.6 C13.8 3.6 10.2 3.6 9.3 4.6 Z" fill="#f5c518" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.25" />
       {/* small gold tiara jewel */}
-      <circle cx="12" cy="2.3" r="0.9" fill="#facc15" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.2" />
+      <circle cx="12" cy="2.3" r="0.95" fill="#facc15" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.2" />
     </svg>
   );
 }
