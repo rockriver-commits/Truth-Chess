@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { getBoardTheme } from '@/components/ThemePicker';
+import MaidenGlyph from '@/components/MaidenGlyph';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚', M: '♟' };
 const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T', M: 'M' };
@@ -23,48 +24,8 @@ function Cross({ color }) {
   );
 }
 
-// The Maiden (M): a feminine figurine — a flowing gown, a head, and a small
-// gold tiara jewel. Like the Truth cross, she is a custom SVG (no Unicode glyph
-// fits), and for the letter piece style she falls back to the letter "M".
-function Maiden({ color }) {
-  const fill = color === 'w' ? '#f8fafc' : '#1f2937';
-  const stroke = color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)';
-  const goldEdge = color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)';
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="w-[68%] h-[68%]"
-      style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
-    >
-      {/* gold triangular pedestal the Maiden sits on */}
-      <polygon points="3.5,23 20.5,23 12,19.5" fill="#f5c518" stroke={goldEdge} strokeWidth="0.3" strokeLinejoin="round" />
-      {/* long golden hair down the back, kept within shoulder width */}
-      <path
-        d="M9 5 C8.4 9 8.6 14 8.8 21 L15.2 21 C15.4 14 15.6 9 15 5 C14.2 6 9.8 6 9 5 Z"
-        fill="#f5c518"
-        stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'}
-        strokeWidth="0.3"
-        opacity="0.95"
-      />
-      {/* hourglass gown — shoulders, cinched waist, flared skirt */}
-      <path
-        d="M8.5 8 C7.4 10.5 9.6 12.2 10.2 13.2 C10.2 14.2 9 15 8.5 17 C8 19.5 5.5 21 5 23 L19 23 C18.5 21 16 19.5 15.5 17 C15 15 13.8 14.2 13.8 13.2 C14.4 12.2 16.6 10.5 15.5 8 Z"
-        fill={fill}
-        stroke={stroke}
-        strokeWidth="0.6"
-        strokeLinejoin="round"
-      />
-      {/* bust shaping line */}
-      <path d="M8.8 9.2 C9.5 10.8 14.5 10.8 15.2 9.2" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.5" />
-      {/* head */}
-      <circle cx="12" cy="5" r="2.8" fill={fill} stroke={stroke} strokeWidth="0.6" />
-      {/* golden hair crown over the head */}
-      <path d="M9.3 4.6 C8.8 2.5 11 1.5 12 1.5 C13 1.5 15.2 2.5 14.7 4.6 C13.8 3.6 10.2 3.6 9.3 4.6 Z" fill="#f5c518" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.25" />
-      {/* small gold tiara jewel */}
-      <circle cx="12" cy="2.3" r="0.95" fill="#facc15" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.2" />
-    </svg>
-  );
-}
+// The Maiden (M) glyph lives in MaidenGlyph.jsx and is shared with the
+// Maiden-mode launch button so the button matches the board piece exactly.
 
 // A small gold unicorn horn sitting on the knight's crown. Sized to fit
 // entirely within the piece's em box (no overflow, no glyph resize).
@@ -116,7 +77,7 @@ export default function ChessBoard({
   const renderPiece = (piece) => {
     if (!piece) return null;
     if (piece.type === 'T') return <Cross color={piece.color} />;
-    if (piece.type === 'M' && pieceStyle !== 'letter') return <Maiden color={piece.color} />;
+    if (piece.type === 'M' && pieceStyle !== 'letter') return <MaidenGlyph color={piece.color} className="w-[68%] h-[68%]" style={piece.color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined} />;
     return (
       <span
         className="relative leading-none"

@@ -61,6 +61,7 @@ import { usePresence } from '@/hooks/usePresence';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 import MaidenHowTo from '@/components/MaidenHowTo';
+import MaidenGlyph from '@/components/MaidenGlyph';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -1735,6 +1736,15 @@ export default function Home() {
                     {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                     Sound
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={donate}
+                    disabled={upgrading}
+                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur text-stone-900 justify-start gap-2"
+                  >
+                    💛 Support — $5
+                  </Button>
                 </div>
               </div>
               <div className="order-first sm:order-none flex flex-col items-center min-w-0 flex-1 w-full">
@@ -1873,16 +1883,7 @@ export default function Home() {
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
         </div>
-        <div className="mt-10 flex justify-center">
-          <button
-            type="button"
-            onClick={donate}
-            disabled={upgrading}
-            className="text-[0.7rem] text-stone-400 hover:text-amber-600 transition-colors opacity-60 hover:opacity-100"
-          >
-            {upgrading ? 'Redirecting…' : '💛 Support the project — $5'}
-          </button>
-        </div>
+
       </div>
 
       {showPro && canUpgrade && (
@@ -1981,13 +1982,7 @@ export default function Home() {
         title="Truth Chess Maiden Mode"
         className="fixed bottom-5 right-5 z-40 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 ring-2 ring-amber-600/40 shadow-lg shadow-amber-500/40 hover:from-amber-400 hover:to-amber-600 transition-colors"
       >
-        <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden="true">
-          <path d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z" fill="#fffbeb" stroke="#92400e" strokeWidth="0.6" strokeLinejoin="round" />
-          <circle cx="12" cy="4.4" r="2.5" fill="#fffbeb" stroke="#92400e" strokeWidth="0.6" />
-          <path d="M9.6 5.4 C7.2 7.5 6.6 12 7.2 15 L9 9 Z" fill="#fffbeb" opacity="0.85" />
-          <path d="M14.4 5.4 C16.8 7.5 17.4 12 16.8 15 L15 9 Z" fill="#fffbeb" opacity="0.85" />
-          <circle cx="12" cy="2.4" r="0.9" fill="#fde68a" stroke="#92400e" strokeWidth="0.25" />
-        </svg>
+        <MaidenGlyph color="b" className="w-7 h-7" />
       </Link>
     </div>
   );
