@@ -75,22 +75,22 @@ function fmtTime(s) {
   return `${m}:${String(ss).padStart(2, '0')}`;
 }
 
-// AI vs AI auto-resign trigger: a side with only a king (no other pieces) and
-// the opponent holding at least 2 real (non-pawn) pieces is a lost cause — the
+// AI vs AI auto-resign trigger: a side reduced to only a king while the
+// opponent still has at least 2 pieces (any kind) is a lost cause — the
 // lone-king side is the "loser" who will offer to resign so spectators don't
 // watch the 50-move rule grind out.
 function loneKingLoser(state) {
-  let wAll = 0, bAll = 0, wPieces = 0, bPieces = 0;
+  let wAll = 0, bAll = 0;
   for (let r = 0; r < 9; r++) {
     for (let f = 0; f < 10; f++) {
       const p = state.board[r][f];
       if (!p || p.type === 'K') continue;
-      if (p.color === 'w') { wAll++; if (p.type !== 'P') wPieces++; }
-      else { bAll++; if (p.type !== 'P') bPieces++; }
+      if (p.color === 'w') wAll++;
+      else bAll++;
     }
   }
-  if (wAll === 0 && bPieces >= 2) return 'w';
-  if (bAll === 0 && wPieces >= 2) return 'b';
+  if (wAll === 0 && bAll >= 2) return 'w';
+  if (bAll === 0 && wAll >= 2) return 'b';
   return null;
 }
 
