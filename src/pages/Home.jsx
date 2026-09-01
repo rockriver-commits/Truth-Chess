@@ -873,7 +873,7 @@ export default function Home() {
 
     if (ownEmail) {
       try {
-        await base44.functions.invoke('email-game', { to: ownEmail, sans: moveSanDisplay, resultStr, imageUrl });
+        await base44.functions.invoke('email-game', { to: ownEmail, sans: moveSanDisplay, resultStr, imageUrl, maidenMode, appUrl: window.location.origin });
         toast({ title: 'Game emailed!', description: 'Check your inbox for the board image and moves.' });
         setSendingEmail(false);
         return;
@@ -885,8 +885,10 @@ export default function Home() {
     const to = ownEmail || window.prompt('Enter the email address to send your game to:');
     if (!to) { setSendingEmail(false); return; }
     const pgn = toPGN(moveSanDisplay, resultStr || '*');
-    const body = imageUrl ? `${pgn}\n\nView the final board: ${imageUrl}` : pgn;
-    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('My Truth Chess Game')}&body=${encodeURIComponent(body)}`;
+    const gameTitle = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
+    const gameLink = `${window.location.origin}${maidenMode ? '/?maiden=1' : '/'}`;
+    const body = `${pgn}\n\nPlay again: ${gameLink}${imageUrl ? `\n\nView the final board: ${imageUrl}` : ''}`;
+    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`My ${gameTitle} Game`)}&body=${encodeURIComponent(body)}`;
     toast({ title: 'Opened your mail app', description: 'Your moves and board link are ready to send.' });
     setSendingEmail(false);
   }
