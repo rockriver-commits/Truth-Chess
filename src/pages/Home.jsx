@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import ChessBoard from '@/components/ChessBoard';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   initialState,
   legalMovesFor,
@@ -116,8 +116,9 @@ export default function Home() {
   // each render so the title/promo UI and the board reset react even when the
   // mode is reached via in-app navigation (where the module-level const was
   // already evaluated without the param).
+  const location = useLocation();
   const maidenMode = (() => {
-    try { return new URLSearchParams(window.location.search).get('maiden') === '1'; }
+    try { return new URLSearchParams(location.search).get('maiden') === '1'; }
     catch { return false; }
   })();
 
@@ -1968,11 +1969,17 @@ export default function Home() {
 
       <Link
         to="/?maiden=1"
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 h-12 shadow-lg shadow-orange-500/30 transition-colors"
-        title="Play Truth Chess Maiden Mode"
+        aria-label="Play Truth Chess Maiden Mode"
+        title="Truth Chess Maiden Mode"
+        className="fixed bottom-5 right-5 z-40 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 ring-2 ring-amber-600/40 shadow-lg shadow-amber-500/40 hover:from-amber-400 hover:to-amber-600 transition-colors"
       >
-        <span>♀️</span>
-        <span className="text-sm">Maiden Mode</span>
+        <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden="true">
+          <path d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z" fill="#fffbeb" stroke="#92400e" strokeWidth="0.6" strokeLinejoin="round" />
+          <circle cx="12" cy="4.4" r="2.5" fill="#fffbeb" stroke="#92400e" strokeWidth="0.6" />
+          <path d="M9.6 5.4 C7.2 7.5 6.6 12 7.2 15 L9 9 Z" fill="#fffbeb" opacity="0.85" />
+          <path d="M14.4 5.4 C16.8 7.5 17.4 12 16.8 15 L15 9 Z" fill="#fffbeb" opacity="0.85" />
+          <circle cx="12" cy="2.4" r="0.9" fill="#fde68a" stroke="#92400e" strokeWidth="0.25" />
+        </svg>
       </Link>
     </div>
   );
