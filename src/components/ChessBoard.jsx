@@ -31,7 +31,7 @@ function KnightHorn({ color }) {
     <svg
       viewBox="0 0 24 24"
       className="absolute pointer-events-none"
-      style={{ left: '31%', top: '-0.31em', transform: 'translateX(-50%) rotate(-20deg)', width: '0.2em', height: '0.4em' }}
+      style={{ left: '38%', top: '-0.2em', transform: 'translateX(-50%) rotate(-38deg)', width: '0.22em', height: '0.42em' }}
       aria-hidden="true"
     >
       <polygon points="12,1 8.5,23 15.5,23" fill="#fbbf24" stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
