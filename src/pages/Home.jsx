@@ -1733,12 +1733,13 @@ export default function Home() {
                         <CapturedSide pieces={viewCaptured.w} label="White captured" />
                       </div>
                     </div>
-                    {state && gameOver && positionList.length > 1 && (
+                    {state && positionList.length > 1 && (
                       <div className="w-full flex justify-center gap-2">
                         <div className="w-full max-w-[600px] flex justify-center">
                           <ReplayBar
                             index={reviewIdx}
                             total={positionList.length}
+                            disabled={!gameOver}
                             onFirst={() => setReviewIdx(0)}
                         onPrev={() =>
                           setReviewIdx((i) => (i === null ? positionList.length - 2 : Math.max(0, i - 1)))
