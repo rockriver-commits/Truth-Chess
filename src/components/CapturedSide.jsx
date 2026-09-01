@@ -16,24 +16,6 @@ function TruthGlyph({ color }) {
   );
 }
 
-// Mini Maiden so a captured Maiden isn't mistaken for a pawn (she'd otherwise
-// fall through to the ♟ glyph).
-function MaidenGlyph({ color }) {
-  const stroke = color === 'w' ? '#e2e8f0' : '#1f2937';
-  const gold = '#f5c518';
-  const goldEdge = color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)';
-  return (
-    <svg viewBox="0 0 24 24" width="13" height="13" style={{ display: 'inline-block', verticalAlign: '-0.15em' }} aria-label="Maiden">
-      <polygon points="4,23 20,23 12,20" fill={gold} stroke={goldEdge} strokeWidth="0.3" strokeLinejoin="round" />
-      <path d="M9 5 C8.4 9 8.6 14 8.8 21 L15.2 21 C15.4 14 15.6 9 15 5 C14.2 6 9.8 6 9 5 Z" fill={gold} stroke={goldEdge} strokeWidth="0.3" opacity="0.95" />
-      <path d="M8.5 8 C7.4 10.5 9.6 12.2 10.2 13.2 C10.2 14.2 9 15 8.5 17 C8 19.5 5.5 21 5 23 L19 23 C18.5 21 16 19.5 15.5 17 C15 15 13.8 14.2 13.8 13.2 C14.4 12.2 16.6 10.5 15.5 8 Z" fill={stroke} />
-      <circle cx="12" cy="5" r="2.6" fill={stroke} />
-      <path d="M9.6 4.4 C9 2.6 11 1.6 12 1.6 C13 1.6 15 2.6 14.4 4.4 C13.5 3.5 10.5 3.5 9.6 4.4 Z" fill={gold} stroke={goldEdge} strokeWidth="0.25" />
-      <circle cx="12" cy="2.3" r="0.9" fill="#facc15" stroke={goldEdge} strokeWidth="0.2" />
-    </svg>
-  );
-}
-
 // Compact captured-pieces card shown to the right of the board. Stacks one
 // per side (White captured, Black captured) so the totals sit beside the
 // board rather than above/below it.
@@ -55,7 +37,7 @@ export default function CapturedSide({ pieces, label }) {
                 textShadow: p.color === 'w' ? '0 0 1px rgba(0,0,0,0.6)' : 'none',
               }}
             >
-              {p.type === 'T' ? <TruthGlyph color={p.color} /> : p.type === 'M' ? <MaidenGlyph color={p.color} /> : GLYPHS[p.type]}
+              {p.type === 'T' ? <TruthGlyph color={p.color} /> : GLYPHS[p.type]}
             </span>
           ))
         )}

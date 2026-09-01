@@ -13,7 +13,7 @@ import {
   loadEvalWeights,
 } from './aiLearning';
 
-const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350, M: 200 };
+const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
 const MATE = 100000;
 // Truth-as-blocker is prioritized over Truth-as-checker: the blockade terms in
 // evaluate() are scaled up by this factor, and Truth-delivered checks get a
@@ -73,7 +73,7 @@ const ZO = (() => {
   const r = () => Math.floor(Math.random() * 0x100000000);
   const t = {};
   for (const c of ['w', 'b']) {
-    for (const ty of ['P', 'N', 'B', 'R', 'Q', 'K', 'T', 'M']) {
+    for (const ty of ['P', 'N', 'B', 'R', 'Q', 'K', 'T']) {
       t[c + ty] = new Uint32Array(FILES * RANKS);
       for (let i = 0; i < FILES * RANKS; i++) t[c + ty][i] = r();
     }
@@ -120,7 +120,7 @@ function buildAttackMap(board) {
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
-      if (!p || p.type === 'T' || p.type === 'M') continue;
+      if (!p || p.type === 'T') continue;
       const atk = p.color === 'w' ? _wAtk : _bAtk;
       const val = p.type === 'K' ? 1 : VALUES[p.type];
       const mark = (ar, af) => {
@@ -181,7 +181,6 @@ function evaluate(board) {
   let wMat = 0, bMat = 0, wMaj = 0, bMaj = 0;
   let wK = null, bK = null;
   const wT = [], bT = [];
-  const wM = [], bM = []; // Maiden positions (king-distraction goal)
   const wPc = [], bPc = []; // opponent targets for Truth blockades (non-K, non-T)
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
@@ -190,7 +189,6 @@ function evaluate(board) {
       const pos = [r, f];
       if (p.type === 'K') { if (p.color === 'w') wK = pos; else bK = pos; continue; }
       if (p.type === 'T') { (p.color === 'w' ? wT : bT).push(pos); }
-      else if (p.type === 'M') { (p.color === 'w' ? wM : bM).push(pos); }
       else { (p.color === 'w' ? wPc : bPc).push({ pos, type: p.type }); }
       const val = VALUES[p.type];
       if (p.color === 'w') { wMat += val; if (p.type === 'Q' || p.type === 'R') wMaj++; }
@@ -409,51 +407,6 @@ function evaluate(board) {
       const oppSide = t[0] > rc ? 1 : 0; // in white's half
       const central = 4.5 - Math.abs(t[1] - fc);
       score -= opPhase * oppSide * central * 3 * TRUTH_BLOCK_BOOST;
-    }
-  }
-
-  // --- Maiden king-distraction -------------------------------------------
-  // The Maiden's main goal is to reach the opposing King. She can't capture
-  // him (she only takes the opposing Truth, and only the opposing Truth can
-  // take her), so the King can't remove her either — making her a perfect
-  // passive blocker. Sitting next to the enemy King she gets in his way,
-  // cramps his escape squares, and distracts him into a juicy endgame. The
-  // pull is always on (it's her reason for being) but grows toward the
-  // endgame, where a cramped king decides the game.
-  {
-    // Biggest positional bonus in the eval: the Maiden sitting next to the
-    // opposing King. She can't take him and he can't take her, so she's the
-    // ideal cramping distraction — reward it above every other piece term.
-    const MAIDEN_PROX = 8;
-    const MAIDEN_ADJ = 80;
-    const phaseMix = 0.4 + 0.6 * egPhase; // always her goal, strongest in the endgame
-    // Keep a friendly Truth close: it protects the Maiden (only the enemy
-    // Truth can take her) and escorts her across the board toward the enemy
-    // King. Reward being near the nearest friendly Truth, strongest early so
-    // she doesn't outrun her protection.
-    const MAIDEN_GUARD = 6;
-    const guardWeight = 0.7 - 0.3 * egPhase;
-    for (const m of wM) {
-      if (bK) {
-        const d = chebyshev(m, bK);
-        score += phaseMix * (9 - d) * MAIDEN_PROX;
-        if (d <= 1) score += phaseMix * MAIDEN_ADJ;
-        else if (d <= 2) score += phaseMix * MAIDEN_ADJ * 0.4;
-      }
-      let guard = Infinity;
-      for (const t of wT) { const d = chebyshev(m, t); if (d < guard) guard = d; }
-      if (guard <= 4) score += guardWeight * (5 - guard) * MAIDEN_GUARD;
-    }
-    for (const m of bM) {
-      if (wK) {
-        const d = chebyshev(m, wK);
-        score -= phaseMix * (9 - d) * MAIDEN_PROX;
-        if (d <= 1) score -= phaseMix * MAIDEN_ADJ;
-        else if (d <= 2) score -= phaseMix * MAIDEN_ADJ * 0.4;
-      }
-      let guard = Infinity;
-      for (const t of bT) { const d = chebyshev(m, t); if (d < guard) guard = d; }
-      if (guard <= 4) score -= guardWeight * (5 - guard) * MAIDEN_GUARD;
     }
   }
 

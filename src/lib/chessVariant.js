@@ -10,12 +10,6 @@
 export const FILES = 10;
 export const RANKS = 9;
 
-// Variant switch. 'classic' = standard Truth Chess; 'maiden' = Truth Chess
-// Maiden Mode, which replaces the four corner pawns (a2/j2/a8/j8) with Maidens.
-let _variant = 'classic';
-export function setVariant(v) { _variant = v; }
-export function getVariant() { return _variant; }
-
 const BACK = ['R', 'N', 'B', 'T', 'Q', 'K', 'T', 'B', 'N', 'R'];
 
 export function initialBoard() {
@@ -25,15 +19,6 @@ export function initialBoard() {
     board[1][f] = { type: 'P', color: 'b' };
     board[7][f] = { type: 'P', color: 'w' };
     board[8][f] = { type: BACK[f], color: 'w' };
-  }
-  // Maiden variant: a Maiden (M) replaces each corner pawn — a2/j2 (White)
-  // and a8/j8 (Black). She moves one square any direction, captures only the
-  // opposing Truth, and is captured only by the opposing Truth.
-  if (_variant === 'maiden') {
-    board[7][0] = { type: 'M', color: 'w' };
-    board[7][9] = { type: 'M', color: 'w' };
-    board[1][0] = { type: 'M', color: 'b' };
-    board[1][9] = { type: 'M', color: 'b' };
   }
   return board;
 }
@@ -116,9 +101,9 @@ function pieceMoves(state, r, f) {
       while (inBounds(tr, tf)) {
         const t = board[tr][tf];
         if (!t) add(tr, tf);
-        // Truth (T) and Maiden (M) are capturable only by an opposing Truth —
-        // so for sliding pieces (B/R/Q) both are impassable blockers.
-        else if (t.color === color || t.type === 'T' || t.type === 'M') break;
+        // Truth (T) is capturable only by an opposing Truth — so for sliding
+        // pieces (B/R/Q) it is an impassable blocker.
+        else if (t.color === color || t.type === 'T') break;
         else {
           add(tr, tf, { captured: t });
           break;
@@ -136,13 +121,12 @@ function pieceMoves(state, r, f) {
       if (!inBounds(tr, tf)) continue;
       const t = board[tr][tf];
       if (!t) add(tr, tf);
-      // Knights cannot capture Truth (T) or a Maiden (M).
-      else if (t.color !== color && t.type !== 'T' && t.type !== 'M') add(tr, tf, { captured: t });
+      // Knights cannot capture Truth (T).
+      else if (t.color !== color && t.type !== 'T') add(tr, tf, { captured: t });
     }
   };
 
-  // King may capture any enemy piece, including the enemy Truth — but not a
-  // Maiden (only an opposing Truth may take a Maiden).
+  // King may capture any enemy piece, including the enemy Truth.
   const kingJumps = (offsets) => {
     for (const [dr, df] of offsets) {
       const tr = r + dr;
@@ -150,7 +134,7 @@ function pieceMoves(state, r, f) {
       if (!inBounds(tr, tf)) continue;
       const t = board[tr][tf];
       if (!t) add(tr, tf);
-      else if (t.color !== color && t.type !== 'M') add(tr, tf, { captured: t });
+      else if (t.color !== color) add(tr, tf, { captured: t });
     }
   };
 
@@ -172,8 +156,8 @@ function pieceMoves(state, r, f) {
         const tf = f + df;
         if (!inBounds(tr, tf)) continue;
         const t = board[tr][tf];
-        // Pawns cannot capture Truth (T) or a Maiden (M).
-        if (t && t.color !== color && t.type !== 'T' && t.type !== 'M') {
+        // Pawns cannot capture Truth (T).
+        if (t && t.color !== color && t.type !== 'T') {
           if (tr === promoRank) add(tr, tf, { captured: t, promotion: true });
           else add(tr, tf, { captured: t });
         } else if (!t && state.ep && state.ep[0] === tr && state.ep[1] === tf) {
@@ -208,29 +192,14 @@ function pieceMoves(state, r, f) {
             const t = board[tr][tf];
             if (!t) add(tr, tf);
             else {
-              // Truth captures only the opposing Truth or an opposing Maiden;
-              // every other piece blocks it.
-              if (t.color === enemy && (t.type === 'T' || t.type === 'M')) add(tr, tf, { captured: t });
+              // Truth captures only the opposing Truth; every other piece blocks it.
+              if (t.color === enemy && t.type === 'T') add(tr, tf, { captured: t });
               break;
             }
             tr += dr;
             tf += df;
           }
         }
-      }
-      break;
-    }
-    case 'M': {
-      // Maiden moves one square in any direction (King-like). She captures only
-      // the opposing Truth; every other piece blocks her.
-      const enemy = color === 'w' ? 'b' : 'w';
-      for (const [dr, df] of KING_OFFSETS) {
-        const tr = r + dr;
-        const tf = f + df;
-        if (!inBounds(tr, tf)) continue;
-        const t = board[tr][tf];
-        if (!t) add(tr, tf);
-        else if (t.color === enemy && t.type === 'T') add(tr, tf, { captured: t });
       }
       break;
     }

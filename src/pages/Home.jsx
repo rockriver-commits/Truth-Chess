@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import ChessBoard from '@/components/ChessBoard';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   initialState,
   legalMovesFor,
@@ -10,22 +10,8 @@ import {
   makeMove,
   findKing,
   positionKey,
-  setVariant,
 } from '@/lib/chessVariant';
 
-// Hidden "Maiden" variant: activated via ?maiden=1 in the URL. Adds a Maiden
-// piece (M) to the four corner pawn squares (a2/j2/a8/j8). She moves one square
-// any direction, captures only the opposing Truth, and is captured only by the
-// opposing Truth. Off by default — no UI exposes it yet.
-const _MAIDEN_MODE = (() => {
-  try {
-    return new URLSearchParams(window.location.search).get('maiden') === '1';
-  } catch {
-    return false;
-  }
-})();
-if (_MAIDEN_MODE) setVariant('maiden');
-if (_MAIDEN_MODE) { document.title = 'TruthMaidin Chess'; }
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import {
   rollOpeningTarget,
@@ -60,8 +46,6 @@ import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
-import MaidenHowTo from '@/components/MaidenHowTo';
-import MaidenGlyph from '@/components/MaidenGlyph';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -114,15 +98,6 @@ function loneKingLoser(state) {
 
 export default function Home() {
   const [mode, setMode] = useState('computer'); // 'local' | 'computer' | 'online'
-  // Hidden Maiden variant — see _MAIDEN_MODE above. Derived live from the URL
-  // each render so the title/promo UI and the board reset react even when the
-  // mode is reached via in-app navigation (where the module-level const was
-  // already evaluated without the param).
-  const location = useLocation();
-  const maidenMode = (() => {
-    try { return new URLSearchParams(location.search).get('maiden') === '1'; }
-    catch { return false; }
-  })();
 
   // local / computer
   const [localState, setLocalState] = useState(initialState);
@@ -206,15 +181,9 @@ export default function Home() {
       .catch(() => { setMe(null); });
   }, []);
 
-  // Activate the hidden Maiden variant on mount (covers in-app navigation,
-  // where the module-level setVariant already ran with the param absent).
-  // resetLocal() re-creates localMoves with a fresh reference so the
-  // positionList memo recomputes against the now-Maiden initial state.
   useEffect(() => {
-    setVariant(maidenMode ? 'maiden' : 'classic');
-    resetLocal();
-    document.title = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
-  }, [maidenMode]);
+    document.title = 'Truth Chess';
+  }, []);
 
   // Stable identity for online play: registered users use their account;
   // guests (not signed in) get a stable localStorage id and show as Anonymous.
@@ -873,7 +842,7 @@ export default function Home() {
 
     if (ownEmail) {
       try {
-        await base44.functions.invoke('email-game', { to: ownEmail, sans: moveSanDisplay, resultStr, imageUrl, maidenMode, appUrl: window.location.origin });
+        await base44.functions.invoke('email-game', { to: ownEmail, sans: moveSanDisplay, resultStr, imageUrl, appUrl: window.location.origin });
         toast({ title: 'Game emailed!', description: 'Check your inbox for the board image and moves.' });
         setSendingEmail(false);
         return;
@@ -885,8 +854,8 @@ export default function Home() {
     const to = ownEmail || window.prompt('Enter the email address to send your game to:');
     if (!to) { setSendingEmail(false); return; }
     const pgn = toPGN(moveSanDisplay, resultStr || '*');
-    const gameTitle = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
-    const gameLink = `${window.location.origin}${maidenMode ? '/?maiden=1' : '/'}`;
+    const gameTitle = 'Truth Chess';
+    const gameLink = `${window.location.origin}/`;
     const body = `${pgn}\n\nPlay again: ${gameLink}${imageUrl ? `\n\nView the final board: ${imageUrl}` : ''}`;
     window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`My ${gameTitle} Game`)}&body=${encodeURIComponent(body)}`;
     toast({ title: 'Opened your mail app', description: 'Your moves and board link are ready to send.' });
@@ -1519,7 +1488,7 @@ export default function Home() {
         flipped={effectiveFlipped}
         checkSquare={viewCheck}
         hintMove={reviewing ? null : hint}
-        boardTheme={maidenMode ? 'green' : 'classic'}
+        boardTheme="classic"
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
@@ -1552,7 +1521,7 @@ export default function Home() {
           <div className="relative mt-2 flex flex-col items-center justify-center gap-2">
             <h1 className="flex flex-col items-center justify-center gap-1 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
               <span className="inline-flex items-center justify-center gap-2">
-                {maidenMode ? 'TruthMaidin' : 'Truth Chess'}
+                Truth Chess
                 <svg
                 viewBox="0 0 24 24"
                 className="h-[0.85em] w-[0.85em] shrink-0"
@@ -1587,15 +1556,7 @@ export default function Home() {
                 </g>
               </svg>
               </span>
-              {maidenMode && (
-                <span className="text-lg sm:text-xl font-medium tracking-[0.25em] text-stone-500">Chess</span>
-              )}
             </h1>
-            {maidenMode && (
-              <p className="italic text-sm sm:text-base text-stone-500 max-w-xl text-center px-4">
-                in long ago days... where chess is just a short'd down story.
-              </p>
-            )}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
               <Link
                 to="/feedback"
@@ -1861,7 +1822,7 @@ export default function Home() {
             )}
 
             {mode !== 'online' && (
-              maidenMode ? <MaidenHowTo /> : <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
+              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
                 <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
                 <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
                   <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
@@ -1927,8 +1888,8 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-[300px]">
             <p className="text-center text-sm font-medium text-stone-600 mb-4">Promote pawn to:</p>
-            <div className={`grid gap-2 ${maidenMode ? 'grid-cols-6' : 'grid-cols-5'}`}>
-              {['Q', 'R', 'B', 'N', 'T', ...(maidenMode ? ['M'] : [])].map((t) => (
+            <div className="grid grid-cols-5 gap-2">
+              {['Q', 'R', 'B', 'N', 'T'].map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -1950,9 +1911,7 @@ export default function Home() {
                     <span
                       className="leading-none"
                       style={{
-                        fontSize: t === 'M' ? '1.5rem' : '2rem',
-                        fontWeight: t === 'M' ? 700 : 400,
-                        fontFamily: t === 'M' ? 'ui-monospace, monospace' : undefined,
+                        fontSize: '2rem',
                         color: promo.color === 'w' ? '#f8fafc' : '#1f2937',
                         textShadow:
                           promo.color === 'w'
@@ -1960,7 +1919,7 @@ export default function Home() {
                             : '0 1px 1px rgba(255,255,255,0.25)',
                       }}
                     >
-                      {t === 'M' ? 'M' : GLYPHS[t]}
+                      {GLYPHS[t]}
                     </span>
                   )}
                 </button>
@@ -1983,14 +1942,6 @@ export default function Home() {
         </div>
       )}
 
-      <Link
-        to="/?maiden=1"
-        aria-label="Play Truth Chess Maiden Mode"
-        title="Truth Chess Maiden Mode"
-        className="fixed bottom-5 right-5 z-40 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 ring-2 ring-amber-600/40 shadow-lg shadow-amber-500/40 hover:from-amber-400 hover:to-amber-600 transition-colors"
-      >
-        <MaidenGlyph color="b" className="w-7 h-7" />
-      </Link>
     </div>
   );
 }

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { getBoardTheme } from '@/components/ThemePicker';
-import MaidenGlyph from '@/components/MaidenGlyph';
 
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚', M: '♟' };
-const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T', M: 'M' };
+const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
+const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T' };
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 
 function Cross({ color }) {
@@ -23,9 +22,6 @@ function Cross({ color }) {
     </svg>
   );
 }
-
-// The Maiden (M) glyph lives in MaidenGlyph.jsx and is shared with the
-// Maiden-mode launch button so the button matches the board piece exactly.
 
 // A small gold unicorn horn sitting on the knight's crown. Sized to fit
 // entirely within the piece's em box (no overflow, no glyph resize).
@@ -77,7 +73,6 @@ export default function ChessBoard({
   const renderPiece = (piece) => {
     if (!piece) return null;
     if (piece.type === 'T') return <Cross color={piece.color} />;
-    if (piece.type === 'M' && pieceStyle !== 'letter') return <MaidenGlyph color={piece.color} className="w-[68%] h-[68%]" style={piece.color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined} />;
     return (
       <span
         className="relative leading-none"
