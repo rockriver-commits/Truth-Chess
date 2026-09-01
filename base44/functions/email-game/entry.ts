@@ -7,15 +7,24 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 export default async function(req) {
   try {
     const body = await req.json().catch(() => ({}));
-    const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl : '';
+    // Only allow http(s) URLs through to the email template. A `javascript:`
+    // (or any non-http) scheme in appUrl/imageUrl would otherwise render as a
+    // clickable/scriptable link in the recipient's webmail (XSS).
+    const safeHttpUrl = (u) => {
+      if (typeof u !== 'string') return '';
+      const trimmed = u.trim();
+      if (!/^https?:\/\//i.test(trimmed)) return '';
+      return trimmed.replace(/\/$/, '');
+    };
+    const imageUrl = safeHttpUrl(body.imageUrl);
     const sans = Array.isArray(body.sans) ? body.sans : [];
     const resultStr =
       typeof body.resultStr === 'string' && body.resultStr ? body.resultStr : '*';
     const maidenMode = !!body.maidenMode;
     const appUrl =
-      (typeof body.appUrl === 'string' ? body.appUrl.trim().replace(/\/$/, '') : '') ||
-      (req.headers.get('X-Base44-App-Url') || '').trim().replace(/\/$/, '') ||
-      (process.env.WIX_CHECKOUT_APP_URL || '').trim().replace(/\/$/, '');
+      safeHttpUrl(body.appUrl) ||
+      safeHttpUrl(req.headers.get('X-Base44-App-Url')) ||
+      safeHttpUrl(process.env.WIX_CHECKOUT_APP_URL);
     const gameLink = appUrl ? `${appUrl}${maidenMode ? '/?maiden=1' : '/'}` : '';
     const gameTitle = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
 
