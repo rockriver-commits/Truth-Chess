@@ -1717,7 +1717,21 @@ export default function Home() {
               </div>
               <div className="order-first sm:order-none flex flex-col items-center min-w-0 flex-1 w-full">
                 {state ? (
-                  <div className="my-3 w-full flex justify-center">{boardEl}</div>
+                  <div className="my-3 w-full flex flex-col sm:flex-row justify-center items-stretch gap-2">
+                    {boardEl}
+                    <div className="flex flex-col justify-between self-stretch gap-4 pb-5">
+                      <CapturedSide pieces={viewCaptured.b} label="Black captured" />
+                      {!spectator && (
+                        <p
+                          key={statusText + turn}
+                          className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
+                        >
+                          {statusText}
+                        </p>
+                      )}
+                      <CapturedSide pieces={viewCaptured.w} label="White captured" />
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
                     Create or join an online game to start playing
@@ -1739,20 +1753,6 @@ export default function Home() {
                   />
                 )}
               </div>
-              {state && (
-                <div className="flex flex-col justify-between self-stretch py-3 gap-4">
-                  <CapturedSide pieces={viewCaptured.b} label="Black captured" />
-                  {!spectator && (
-                    <p
-                      key={statusText + turn}
-                      className="text-sm font-bold text-center leading-tight whitespace-nowrap animate-status-flash"
-                    >
-                      {statusText}
-                    </p>
-                  )}
-                  <CapturedSide pieces={viewCaptured.w} label="White captured" />
-                </div>
-              )}
             </div>
             {state ? (
               <>
