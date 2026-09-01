@@ -567,6 +567,13 @@ export default function Home() {
       if (canUpgrade) setShowPro(true);
       return;
     }
+    // Don't restart an in-progress local/computer/AI-vs-AI game when its mode
+    // button is tapped — let the current game finish first, then the button
+    // starts a fresh one. The Reset button is the explicit restart.
+    if (m !== 'online' && started && !gameOver) {
+      toast({ title: 'Game in progress', description: 'Finish it (or press Reset) to start a new one.' });
+      return;
+    }
     if (m === 'online') {
       // Already in an active game — no need to re-matchmake.
       if (mode === 'online' && onlineGame?.status === 'active') return;

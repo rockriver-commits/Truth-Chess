@@ -660,6 +660,99 @@ function pickNonDrawing(state, preferred, ordered, positionKeys) {
   return alt || preferred;
 }
 
+// --- Pawn-grab safety (root move filter) ---------------------------------
+// Valuable pieces (N/B/R/Q) should not grab defended pawns that lose material
+// — a knight taking a pawn only to be recaptured by a rook trades a minor for
+// a pawn. The engine avoids such grabs at the root unless that's all there is.
+// Truth is excluded (it never captures ordinary pieces), and a capturer that
+// is already under attack is allowed to salvage a pawn.
+
+function leastValuableAttacker(board, tr, tf, color) {
+  const pdir = color === 'w' ? 1 : -1; // a white pawn attacking (tr,tf) sits at tr+1
+  for (const df of [-1, 1]) {
+    const r = tr + pdir, f = tf + df;
+    if (r >= 0 && r < RANKS && f >= 0 && f < FILES) {
+      const p = board[r][f];
+      if (p && p.type === 'P' && p.color === color) return { r, f, type: 'P' };
+    }
+  }
+  for (const [dr, df] of KNIGHT_OFFSETS) {
+    const r = tr + dr, f = tf + df;
+    if (r >= 0 && r < RANKS && f >= 0 && f < FILES) {
+      const p = board[r][f];
+      if (p && p.type === 'N' && p.color === color) return { r, f, type: 'N' };
+    }
+  }
+  for (const [dr, df] of BISHOP_DIRS) {
+    let r = tr + dr, f = tf + df;
+    while (r >= 0 && r < RANKS && f >= 0 && f < FILES) {
+      const p = board[r][f];
+      if (p) { if (p.color === color && (p.type === 'B' || p.type === 'Q')) return { r, f, type: p.type }; break; }
+      r += dr; f += df;
+    }
+  }
+  for (const [dr, df] of ROOK_DIRS) {
+    let r = tr + dr, f = tf + df;
+    while (r >= 0 && r < RANKS && f >= 0 && f < FILES) {
+      const p = board[r][f];
+      if (p) { if (p.color === color && (p.type === 'R' || p.type === 'Q')) return { r, f, type: p.type }; break; }
+      r += dr; f += df;
+    }
+  }
+  for (const [dr, df] of KING_OFFSETS) {
+    const r = tr + dr, f = tf + df;
+    if (r >= 0 && r < RANKS && f >= 0 && f < FILES) {
+      const p = board[r][f];
+      if (p && p.type === 'K' && p.color === color) return { r, f, type: 'K' };
+    }
+  }
+  return null;
+}
+
+// Static exchange evaluation of a capture (no x-ray attackers). Returns the
+// net material from the mover's perspective; negative means the capture loses
+// material. A king recapture ends the exchange (the king can't be recaptured).
+function see(state, move) {
+  if (!move.captured) return 0;
+  const [tr, tf] = move.to;
+  const board = cloneBoard(state.board);
+  const mover = move.piece.color;
+  let side = mover === 'w' ? 'b' : 'w';
+  const a = [VALUES[move.captured.type]];
+  board[tr][tf] = { type: move.piece.type, color: mover };
+  board[move.from[0]][move.from[1]] = null;
+  while (a.length < 32) {
+    const atk = leastValuableAttacker(board, tr, tf, side);
+    if (!atk) break;
+    const onSquare = board[tr][tf];
+    if (atk.type === 'K') {
+      const other = side === 'w' ? 'b' : 'w';
+      if (isSquareAttacked(board, tr, tf, other)) break; // king can't safely recapture
+      a.push(VALUES[onSquare.type]);
+      break; // king recapture ends the exchange
+    }
+    a.push(VALUES[onSquare.type]);
+    board[tr][tf] = { type: atk.type, color: side };
+    board[atk.r][atk.f] = null;
+    side = side === 'w' ? 'b' : 'w';
+  }
+  if (a.length === 1) return a[0];
+  const f = new Array(a.length);
+  f[a.length - 1] = a[a.length - 1];
+  for (let k = a.length - 2; k >= 1; k--) f[k] = Math.max(0, a[k] - f[k + 1]);
+  return a[0] - f[1];
+}
+
+function isBadPawnGrab(state, move, opp) {
+  if (!move.captured || move.captured.type !== 'P') return false;
+  const pt = move.piece.type;
+  if (pt !== 'N' && pt !== 'B' && pt !== 'R' && pt !== 'Q') return false;
+  // A capturer already under attack may salvage a pawn — only filter grabs
+  // that initiate a losing exchange from a safe square.
+  if (isSquareAttacked(state.board, move.from[0], move.from[1], opp)) return false;
+  return see(state, move) < 0;
+}
+
 export function bestMove(state, color, difficulty = 4, aggressiveMode = false, ctx = null) {
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES[4];
   useQuiescence = cfg.quiescence;
@@ -681,6 +774,15 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
 
+  // Root move filter: valuable pieces (N/B/R/Q) must not grab defended pawns
+  // that lose material (a knight taking a pawn only to be recaptured by a
+  // rook trades a minor for a pawn). Such grabs are dropped from the root
+  // move list unless every move is one. Truth is excluded; a capturer already
+  // under attack may salvage a pawn.
+  const oppCol = color === 'w' ? 'b' : 'w';
+  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m, oppCol));
+  const rootMoves = safeRoot.length ? safeRoot : moves;
+
   // Mate book (with mirrored fallback): a forced mate-in-1 is always sound to
   // play instantly; deeper remembered mates are used as a strong move-ordering
   // hint (the search re-verifies them), so the engine gravitates toward lines
@@ -699,16 +801,16 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   // Weak levels: sometimes play a random legal move — but never one that
   // draws (threefold / 50-move) unless every move draws.
   if (cfg.randomness > 0 && Math.random() < cfg.randomness) {
-    return pickNonDrawing(state, moves[Math.floor(Math.random() * moves.length)], moves, pkeys);
+    return pickNonDrawing(state, rootMoves[Math.floor(Math.random() * rootMoves.length)], rootMoves, pkeys);
   }
 
-  let ordered = orderMoves(moves);
+  let ordered = orderMoves(rootMoves);
   // Result-weighted root ordering: learned self-play win-rates promote
   // historically-winning moves to the front of the search (the search still
   // re-verifies them), and a persisted best-move hint seeds the ordering like a
   // transposition-table best move so the engine reaches its trusted move fast.
   if (curLearnedScores && curLearnedScores.size) {
-    ordered = moves
+    ordered = rootMoves
       .map((m) => ({ m, s: 1e6 * (curLearnedScores.get(`${m.from[0]},${m.from[1]},${m.to[0]},${m.to[1]}`) || 0) }))
       .sort((a, b) => b.s - a.s)
       .map((x) => x.m);
