@@ -827,20 +827,32 @@ export default function Home() {
 
     if (prevReview !== null) setReviewIdx(prevReview);
 
-    const to = me && me.email ? me.email : window.prompt('Enter the email address to send your game to:');
-    if (!to) { setSendingEmail(false); return; }
+    // SendEmail only reaches registered app users (without a connected custom
+    // domain). To avoid spending an integration credit on a send that is
+    // guaranteed to fail, guests and any address we can't confirm is
+    // registered skip the platform email entirely and open their own mail
+    // client instead. Registered users sending to their own address still get
+    // the direct email (1 credit, intended use).
+    const ownEmail = me && me.email ? me.email : null;
 
-    try {
-      await base44.functions.invoke('email-game', { to, sans: moveSanDisplay, resultStr, imageUrl });
-      toast({ title: 'Game emailed!', description: 'Check your inbox for the board image and moves.' });
-    } catch (e) {
-      const pgn = toPGN(moveSanDisplay, resultStr || '*');
-      const body = imageUrl ? `${pgn}\n\nView the final board: ${imageUrl}` : pgn;
-      window.location.href = `mailto:?subject=${encodeURIComponent('My Truth Chess Game')}&body=${encodeURIComponent(body)}`;
-      toast({ title: 'Opened your mail app', description: 'Direct send failed — moves and board link are ready to send.' });
-    } finally {
-      setSendingEmail(false);
+    if (ownEmail) {
+      try {
+        await base44.functions.invoke('email-game', { to: ownEmail, sans: moveSanDisplay, resultStr, imageUrl });
+        toast({ title: 'Game emailed!', description: 'Check your inbox for the board image and moves.' });
+        setSendingEmail(false);
+        return;
+      } catch (e) {
+        // direct send failed — fall through to the mail-app fallback
+      }
     }
+
+    const to = ownEmail || window.prompt('Enter the email address to send your game to:');
+    if (!to) { setSendingEmail(false); return; }
+    const pgn = toPGN(moveSanDisplay, resultStr || '*');
+    const body = imageUrl ? `${pgn}\n\nView the final board: ${imageUrl}` : pgn;
+    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('My Truth Chess Game')}&body=${encodeURIComponent(body)}`;
+    toast({ title: 'Opened your mail app', description: 'Your moves and board link are ready to send.' });
+    setSendingEmail(false);
   }
 
   async function refreshOpenGames() {
