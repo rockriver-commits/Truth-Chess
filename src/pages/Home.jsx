@@ -44,8 +44,9 @@ import ResignFlowBanner from '@/components/ResignFlowBanner';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
-import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX, Dna } from 'lucide-react';
+import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
+import EngineTraining from '@/components/EngineTraining';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -57,7 +58,6 @@ const MODES = [
   { key: 'computer', label: 'vs Computer', pro: false, Icon: Computer, active: 'bg-emerald-100 text-emerald-700 ring-emerald-300', icon: 'text-emerald-500' },
   { key: 'local', label: '2 Players', pro: true, Icon: Users, active: 'bg-sky-100 text-sky-700 ring-sky-300', icon: 'text-sky-500' },
   { key: 'cvc_turbo', label: 'AI vs AI', pro: false, turbo: true, Icon: Bot, active: 'bg-amber-100 text-amber-700 ring-amber-300', icon: 'text-amber-500' },
-  { key: 'training', label: 'Training', pro: false, Icon: Dna, active: 'bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-300', icon: 'text-fuchsia-500' },
 ];
 
 const TIME_CONTROLS = {
@@ -159,6 +159,12 @@ export default function Home() {
   const [cvcResignResult, setCvcResignResult] = useState(null);
   // Deep training mode: counts consecutive self-play games played this session.
   const [trainingGames, setTrainingGames] = useState(0);
+  // Engine Training card: chosen game count + search depth, plus an active flag
+  // that drives AI-vs-AI self-play at ~120ms cadence until the target is met.
+  const [trainingActive, setTrainingActive] = useState(false);
+  const [trainingTarget, setTrainingTarget] = useState(25);
+  const [trainingDepth, setTrainingDepth] = useState(6);
+  const prevSoundRef = useRef(true);
   // vs Computer: the human's color for the current game. Default White; a
   // player who wins as Black earns White for the next game (traditional chess).
   const [playerColor, setPlayerColor] = useState('w');
@@ -565,8 +571,29 @@ export default function Home() {
 
   function changeMode(m) {
     leaveOnline();
+    if (trainingActive) {
+      setTrainingActive(false);
+      setSoundOn(prevSoundRef.current);
+    }
     setMode(m);
     setTrainingGames(0);
+    resetLocal();
+  }
+
+  function startTraining() {
+    prevSoundRef.current = soundOn;
+    setTrainingGames(0);
+    setTrainingActive(true);
+    setSoundOn(false);
+    setMode('cvc_turbo');
+    resetLocal();
+    setStarted(true);
+  }
+
+  function stopTraining() {
+    setTrainingActive(false);
+    setSoundOn(prevSoundRef.current);
+    setMode('computer');
     resetLocal();
   }
 
@@ -1234,7 +1261,7 @@ export default function Home() {
   // pursuing checkmate and never allowing threefold repetition. Move cadence
   // varies slightly (0.91 / 1.5 / 2 s) so the rhythm feels natural.
   useEffect(() => {
-    if ((mode !== 'cvc' && mode !== 'cvc_turbo' && mode !== 'training') || gameOver || promo || !started || autoResign) return;
+    if ((mode !== 'cvc' && mode !== 'cvc_turbo') || gameOver || promo || !started || autoResign) return;
     // Auto-resign: if the side to move has only a king and the opponent has at
     // least 2 real pieces, the lone-king side offers to resign instead of
     // moving. The visible offer→accept flow is driven by the effect below.
@@ -1268,7 +1295,7 @@ export default function Home() {
     }
     const fastKings = onlyKings && localMoves.length - kingOnlySinceRef.current >= 4;
     setThinking(true);
-    const baseDelay = mode === 'cvc_turbo' ? 500 : mode === 'training' ? 150 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
+    const baseDelay = trainingActive ? 120 : mode === 'cvc_turbo' ? 500 : [910, 1500, 2000][Math.floor(Math.random() * 3)];
     const delay = fastKings ? 120 : baseDelay;
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, localState.turn);
@@ -1288,7 +1315,8 @@ export default function Home() {
           bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
           positionKeys: positionList.map((p) => positionKey(p.state)),
         };
-        move = bestMove(localState, localState.turn, mode === 'cvc_turbo' ? 3 : mode === 'training' ? 6 : 7, true, ctx);
+        const searchDepth = trainingActive ? trainingDepth : mode === 'cvc_turbo' ? 3 : 7;
+        move = bestMove(localState, localState.turn, searchDepth, true, ctx);
         if (move) move = pickNonRepeating(localState, move, localMoves);
       }
       if (move) commitMove(move, 'Q');
@@ -1316,21 +1344,29 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [autoResign]);
 
-  // Deep training: when a self-play training game ends, automatically start a
-  // fresh one after a short pause so the engine accumulates LearnedPosition and
-  // MateBook rows across many consecutive games — pure search, no LLM, no
-  // integration credits. The learning hooks (recordMate / recordGameResult /
-  // tuneEvalWeights / updateAggression) already fire on game over above.
+  // Engine Training auto-restart: when a self-play game ends, count it and
+  // start a fresh one back-to-back until the chosen game-count target is met,
+  // then stop. A ref guard ensures each game-over is counted exactly once
+  // (trainingGames is in the deps but gameOver stays true until resetLocal).
+  const trainingCountedRef = useRef(false);
   useEffect(() => {
-    if (mode !== 'training' || !started || !gameOver) return;
+    if (mode !== 'cvc_turbo' || !trainingActive) return;
+    if (!gameOver) { trainingCountedRef.current = false; return; }
+    if (trainingCountedRef.current) return;
+    trainingCountedRef.current = true;
+    const newCount = trainingGames + 1;
+    setTrainingGames(newCount);
+    if (newCount >= trainingTarget) {
+      const t = setTimeout(() => stopTraining(), 1200);
+      return () => clearTimeout(t);
+    }
     const t = setTimeout(() => {
-      setTrainingGames((n) => n + 1);
       resetLocal();
       setStarted(true);
-    }, 1400);
+    }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, started, gameOver]);
+  }, [mode, trainingActive, gameOver, trainingGames, trainingTarget]);
 
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
@@ -1380,7 +1416,7 @@ export default function Home() {
       return;
     }
     if (recordedRef.current) return;
-    const isCvc = mode === 'cvc' || mode === 'cvc_turbo' || mode === 'training';
+    const isCvc = mode === 'cvc' || mode === 'cvc_turbo';
     const isAiMode = isCvc || mode === 'computer' || (mode === 'online' && ghostOpponent);
     if (status === 'checkmate') {
       recordedRef.current = true;
@@ -1765,14 +1801,7 @@ export default function Home() {
                         <div className="hidden sm:block w-32 shrink-0" aria-hidden="true" />
                       </div>
                     )}
-                    {mode === 'training' && (
-                      <div className="w-full flex justify-center">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-fuchsia-700 bg-fuchsia-50 ring-1 ring-fuchsia-200 rounded-full px-3 py-1">
-                          <Dna className="w-3.5 h-3.5" />
-                          Training run · {trainingGames} {trainingGames === 1 ? 'game' : 'games'} · depth 10
-                        </span>
-                      </div>
-                    )}
+
                   </div>
                 ) : (
                   <div className="w-full aspect-[10/9] rounded-2xl bg-white/60 ring-1 ring-stone-200 flex items-center justify-center text-stone-400 text-sm text-center px-6">
@@ -1824,6 +1853,16 @@ export default function Home() {
             {me && !identity.player_name && (
               <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
             )}
+            <EngineTraining
+              active={trainingActive}
+              target={trainingTarget}
+              depth={trainingDepth}
+              gamesCompleted={trainingGames}
+              onStart={startTraining}
+              onStop={stopTraining}
+              onSelectTarget={setTrainingTarget}
+              onSelectDepth={setTrainingDepth}
+            />
             {mode === 'online' && (
               <OnlinePanel
                 onlineGame={onlineGame}
