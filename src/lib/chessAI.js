@@ -13,7 +13,7 @@ import {
   loadEvalWeights,
 } from './aiLearning';
 
-const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
+const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350, M: 200 };
 const MATE = 100000;
 // Truth-as-blocker is prioritized over Truth-as-checker: the blockade terms in
 // evaluate() are scaled up by this factor, and Truth-delivered checks get a
@@ -73,7 +73,7 @@ const ZO = (() => {
   const r = () => Math.floor(Math.random() * 0x100000000);
   const t = {};
   for (const c of ['w', 'b']) {
-    for (const ty of ['P', 'N', 'B', 'R', 'Q', 'K', 'T']) {
+    for (const ty of ['P', 'N', 'B', 'R', 'Q', 'K', 'T', 'M']) {
       t[c + ty] = new Uint32Array(FILES * RANKS);
       for (let i = 0; i < FILES * RANKS; i++) t[c + ty][i] = r();
     }
@@ -120,7 +120,7 @@ function buildAttackMap(board) {
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
-      if (!p || p.type === 'T') continue;
+      if (!p || p.type === 'T' || p.type === 'M') continue;
       const atk = p.color === 'w' ? _wAtk : _bAtk;
       const val = p.type === 'K' ? 1 : VALUES[p.type];
       const mark = (ar, af) => {

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { getBoardTheme } from '@/components/ThemePicker';
 
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
-const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T' };
+const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚', M: '♟' };
+const LETTERS = { K: 'K', Q: 'Q', R: 'R', B: 'B', N: 'N', P: 'P', T: 'T', M: 'M' };
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 
 function Cross({ color }) {
@@ -19,6 +19,37 @@ function Cross({ color }) {
       <rect x="10" y="0" width="4" height="23" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
       <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
       <circle cx="12" cy="8.5" r="2.6" fill="#facc15" stroke={stroke} strokeWidth="0.3" />
+    </svg>
+  );
+}
+
+// The Maiden (M): a feminine figurine — a flowing gown, a head, and a small
+// gold tiara jewel. Like the Truth cross, she is a custom SVG (no Unicode glyph
+// fits), and for the letter piece style she falls back to the letter "M".
+function Maiden({ color }) {
+  const fill = color === 'w' ? '#f8fafc' : '#1f2937';
+  const stroke = color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)';
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-[62%] h-[62%]"
+      style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
+    >
+      {/* flowing gown */}
+      <path
+        d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      {/* head */}
+      <circle cx="12" cy="4.4" r="2.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      {/* flowing hair / veil on each side */}
+      <path d="M9.6 5.4 C7.2 7.5 6.6 12 7.2 15 L9 9 Z" fill={fill} opacity="0.85" />
+      <path d="M14.4 5.4 C16.8 7.5 17.4 12 16.8 15 L15 9 Z" fill={fill} opacity="0.85" />
+      {/* small gold tiara jewel */}
+      <circle cx="12" cy="2.4" r="0.9" fill="#facc15" stroke={stroke} strokeWidth="0.25" />
     </svg>
   );
 }
@@ -73,6 +104,7 @@ export default function ChessBoard({
   const renderPiece = (piece) => {
     if (!piece) return null;
     if (piece.type === 'T') return <Cross color={piece.color} />;
+    if (piece.type === 'M' && pieceStyle !== 'letter') return <Maiden color={piece.color} />;
     return (
       <span
         className="relative leading-none"

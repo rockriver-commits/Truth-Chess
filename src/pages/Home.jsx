@@ -10,7 +10,22 @@ import {
   makeMove,
   findKing,
   positionKey,
+  setVariant,
 } from '@/lib/chessVariant';
+
+// Hidden "Maiden" variant: activated via ?maiden=1 in the URL. Adds a Maiden
+// piece (M) to the four corner pawn squares (a2/j2/a8/j8). She moves one square
+// any direction, captures only the opposing Truth, and is captured only by the
+// opposing Truth. Off by default — no UI exposes it yet.
+const _MAIDEN_MODE = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('maiden') === '1';
+  } catch {
+    return false;
+  }
+})();
+if (_MAIDEN_MODE) setVariant('maiden');
+if (_MAIDEN_MODE) { document.title = 'Truth Chess Maiden Mode'; }
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import {
   rollOpeningTarget,
@@ -97,6 +112,14 @@ function loneKingLoser(state) {
 
 export default function Home() {
   const [mode, setMode] = useState('computer'); // 'local' | 'computer' | 'online'
+  // Hidden Maiden variant — see _MAIDEN_MODE above. Derived live from the URL
+  // each render so the title/promo UI and the board reset react even when the
+  // mode is reached via in-app navigation (where the module-level const was
+  // already evaluated without the param).
+  const maidenMode = (() => {
+    try { return new URLSearchParams(window.location.search).get('maiden') === '1'; }
+    catch { return false; }
+  })();
 
   // local / computer
   const [localState, setLocalState] = useState(initialState);
@@ -179,6 +202,16 @@ export default function Home() {
       .then((u) => { setMe(u); })
       .catch(() => { setMe(null); });
   }, []);
+
+  // Activate the hidden Maiden variant on mount (covers in-app navigation,
+  // where the module-level setVariant already ran with the param absent).
+  // resetLocal() re-creates localMoves with a fresh reference so the
+  // positionList memo recomputes against the now-Maiden initial state.
+  useEffect(() => {
+    setVariant(maidenMode ? 'maiden' : 'classic');
+    resetLocal();
+    document.title = maidenMode ? 'Truth Chess Maiden Mode' : 'Truth Chess';
+  }, [maidenMode]);
 
   // Stable identity for online play: registered users use their account;
   // guests (not signed in) get a stable localStorage id and show as Anonymous.
@@ -1513,7 +1546,7 @@ export default function Home() {
           </p>
           <div className="relative mt-2 flex items-center justify-center">
             <h1 className="inline-flex items-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800">
-              Truth Chess
+              {maidenMode ? 'Truth Chess Maiden Mode' : 'Truth Chess'}
               <svg
                 viewBox="0 0 24 24"
                 className="h-[0.85em] w-[0.85em] shrink-0"
@@ -1877,8 +1910,8 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-[300px]">
             <p className="text-center text-sm font-medium text-stone-600 mb-4">Promote pawn to:</p>
-            <div className="grid grid-cols-5 gap-2">
-              {['Q', 'R', 'B', 'N', 'T'].map((t) => (
+            <div className={`grid gap-2 ${maidenMode ? 'grid-cols-6' : 'grid-cols-5'}`}>
+              {['Q', 'R', 'B', 'N', 'T', ...(maidenMode ? ['M'] : [])].map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -1900,7 +1933,9 @@ export default function Home() {
                     <span
                       className="leading-none"
                       style={{
-                        fontSize: '2rem',
+                        fontSize: t === 'M' ? '1.5rem' : '2rem',
+                        fontWeight: t === 'M' ? 700 : 400,
+                        fontFamily: t === 'M' ? 'ui-monospace, monospace' : undefined,
                         color: promo.color === 'w' ? '#f8fafc' : '#1f2937',
                         textShadow:
                           promo.color === 'w'
@@ -1908,7 +1943,7 @@ export default function Home() {
                             : '0 1px 1px rgba(255,255,255,0.25)',
                       }}
                     >
-                      {GLYPHS[t]}
+                      {t === 'M' ? 'M' : GLYPHS[t]}
                     </span>
                   )}
                 </button>

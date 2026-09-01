@@ -16,6 +16,19 @@ function TruthGlyph({ color }) {
   );
 }
 
+// Mini Maiden so a captured Maiden isn't mistaken for a pawn (she'd otherwise
+// fall through to the ♟ glyph).
+function MaidenGlyph({ color }) {
+  const stroke = color === 'w' ? '#e2e8f0' : '#1f2937';
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" style={{ display: 'inline-block', verticalAlign: '-0.15em' }} aria-label="Maiden">
+      <path d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z" fill={stroke} />
+      <circle cx="12" cy="4.4" r="2.5" fill={stroke} />
+      <circle cx="12" cy="2.4" r="0.9" fill="#facc15" />
+    </svg>
+  );
+}
+
 // Compact captured-pieces card shown to the right of the board. Stacks one
 // per side (White captured, Black captured) so the totals sit beside the
 // board rather than above/below it.
@@ -37,7 +50,7 @@ export default function CapturedSide({ pieces, label }) {
                 textShadow: p.color === 'w' ? '0 0 1px rgba(0,0,0,0.6)' : 'none',
               }}
             >
-              {p.type === 'T' ? <TruthGlyph color={p.color} /> : GLYPHS[p.type]}
+              {p.type === 'T' ? <TruthGlyph color={p.color} /> : p.type === 'M' ? <MaidenGlyph color={p.color} /> : GLYPHS[p.type]}
             </span>
           ))
         )}
