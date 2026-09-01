@@ -421,22 +421,39 @@ function evaluate(board) {
   // pull is always on (it's her reason for being) but grows toward the
   // endgame, where a cramped king decides the game.
   {
-    const MAIDEN_PROX = 5;
-    const MAIDEN_ADJ = 20;
+    // Biggest positional bonus in the eval: the Maiden sitting next to the
+    // opposing King. She can't take him and he can't take her, so she's the
+    // ideal cramping distraction — reward it above every other piece term.
+    const MAIDEN_PROX = 8;
+    const MAIDEN_ADJ = 80;
     const phaseMix = 0.4 + 0.6 * egPhase; // always her goal, strongest in the endgame
+    // Keep a friendly Truth close: it protects the Maiden (only the enemy
+    // Truth can take her) and escorts her across the board toward the enemy
+    // King. Reward being near the nearest friendly Truth, strongest early so
+    // she doesn't outrun her protection.
+    const MAIDEN_GUARD = 6;
+    const guardWeight = 0.7 - 0.3 * egPhase;
     for (const m of wM) {
-      if (!bK) break;
-      const d = chebyshev(m, bK);
-      score += phaseMix * (9 - d) * MAIDEN_PROX;
-      if (d <= 1) score += phaseMix * MAIDEN_ADJ;
-      else if (d <= 2) score += phaseMix * MAIDEN_ADJ * 0.5;
+      if (bK) {
+        const d = chebyshev(m, bK);
+        score += phaseMix * (9 - d) * MAIDEN_PROX;
+        if (d <= 1) score += phaseMix * MAIDEN_ADJ;
+        else if (d <= 2) score += phaseMix * MAIDEN_ADJ * 0.4;
+      }
+      let guard = Infinity;
+      for (const t of wT) { const d = chebyshev(m, t); if (d < guard) guard = d; }
+      if (guard <= 4) score += guardWeight * (5 - guard) * MAIDEN_GUARD;
     }
     for (const m of bM) {
-      if (!wK) break;
-      const d = chebyshev(m, wK);
-      score -= phaseMix * (9 - d) * MAIDEN_PROX;
-      if (d <= 1) score -= phaseMix * MAIDEN_ADJ;
-      else if (d <= 2) score -= phaseMix * MAIDEN_ADJ * 0.5;
+      if (wK) {
+        const d = chebyshev(m, wK);
+        score -= phaseMix * (9 - d) * MAIDEN_PROX;
+        if (d <= 1) score -= phaseMix * MAIDEN_ADJ;
+        else if (d <= 2) score -= phaseMix * MAIDEN_ADJ * 0.4;
+      }
+      let guard = Infinity;
+      for (const t of bT) { const d = chebyshev(m, t); if (d < guard) guard = d; }
+      if (guard <= 4) score -= guardWeight * (5 - guard) * MAIDEN_GUARD;
     }
   }
 
