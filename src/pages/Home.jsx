@@ -1589,14 +1589,6 @@ export default function Home() {
               </p>
             )}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
-              <Button
-                onClick={donate}
-                disabled={upgrading}
-                className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
-              >
-                <span>💛</span>
-                <span className="hidden sm:inline">{upgrading ? 'Redirecting…' : 'Support — $5'}</span>
-              </Button>
               <Link
                 to="/feedback"
                 className="inline-flex items-center justify-center gap-1 bg-stone-800 hover:bg-stone-900 text-white font-medium px-2 sm:px-3 h-7 sm:h-8 text-xs rounded-full shadow-sm whitespace-nowrap"
@@ -1880,6 +1872,16 @@ export default function Home() {
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
+        </div>
+        <div className="mt-10 flex justify-center">
+          <button
+            type="button"
+            onClick={donate}
+            disabled={upgrading}
+            className="text-[0.7rem] text-stone-400 hover:text-amber-600 transition-colors opacity-60 hover:opacity-100"
+          >
+            {upgrading ? 'Redirecting…' : '💛 Support the project — $5'}
+          </button>
         </div>
       </div>
 
