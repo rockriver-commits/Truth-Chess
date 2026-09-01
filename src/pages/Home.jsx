@@ -1853,16 +1853,18 @@ export default function Home() {
             {me && !identity.player_name && (
               <PlayerNameCard currentName={identity.player_name} onSave={savePlayerName} />
             )}
-            <EngineTraining
-              active={trainingActive}
-              target={trainingTarget}
-              depth={trainingDepth}
-              gamesCompleted={trainingGames}
-              onStart={startTraining}
-              onStop={stopTraining}
-              onSelectTarget={setTrainingTarget}
-              onSelectDepth={setTrainingDepth}
-            />
+            {me?.role === 'admin' && (
+              <EngineTraining
+                active={trainingActive}
+                target={trainingTarget}
+                depth={trainingDepth}
+                gamesCompleted={trainingGames}
+                onStart={startTraining}
+                onStop={stopTraining}
+                onSelectTarget={setTrainingTarget}
+                onSelectDepth={setTrainingDepth}
+              />
+            )}
             {mode === 'online' && (
               <OnlinePanel
                 onlineGame={onlineGame}
