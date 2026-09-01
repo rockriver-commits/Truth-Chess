@@ -14,8 +14,11 @@ export default async function(req) {
       );
     }
     const body = await req.json().catch(() => ({}));
-    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '';
-    const email = typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '';
+    // Strip CR/LF and other control chars so a crafted name/email can't inject
+    // extra mail headers (Bcc, etc.) via the subject line — email header injection.
+    const stripControls = (s) => s.replace(/[\r\n\0]/g, ' ').replace(/[^\x20-\x7E]/g, ' ');
+    const name = typeof body.name === 'string' ? stripControls(body.name.trim()).slice(0, 100) : '';
+    const email = typeof body.email === 'string' ? stripControls(body.email.trim()).slice(0, 200) : '';
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message || message.length > 5000) {
       return Response.json(
