@@ -23,6 +23,36 @@ function Cross({ color }) {
   );
 }
 
+// A short unicorn horn drawn on top of the knight (♞) glyph. It is absolutely
+// positioned inside the knight's piece span so it adds no height or width to
+// the piece — it sits in the empty space above the horse's head, within the
+// existing em box.
+function KnightHorn({ color }) {
+  const base = '#fbbf24';
+  const stripe = '#92400e';
+  const edge = color === 'w' ? 'rgba(15,23,42,0.65)' : 'rgba(0,0,0,0.5)';
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="absolute pointer-events-none"
+      style={{ left: '50%', top: '0', transform: 'translateX(-50%)', width: '0.55em', height: '0.55em' }}
+      aria-hidden="true"
+    >
+      <defs>
+        <clipPath id="knightHornClip">
+          <polygon points="12,1 8.4,15.5 15.6,15.5" />
+        </clipPath>
+      </defs>
+      <polygon points="12,1 8.4,15.5 15.6,15.5" fill={base} stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
+      <g clipPath="url(#knightHornClip)" stroke={stripe} strokeWidth="0.9" fill="none" strokeLinecap="round">
+        <path d="M9.2 14 L13.8 12.2" />
+        <path d="M9.8 11 L13.4 9.2" />
+        <path d="M10.4 8 L13 6.4" />
+      </g>
+    </svg>
+  );
+}
+
 export default function ChessBoard({
   board,
   selected,
@@ -71,6 +101,7 @@ export default function ChessBoard({
         }}
       >
         {pieceStyle === 'letter' ? LETTERS[piece.type] : GLYPHS[piece.type]}
+        {piece.type === 'N' && pieceStyle !== 'letter' && <KnightHorn color={piece.color} />}
       </span>
     );
   };

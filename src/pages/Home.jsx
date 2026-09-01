@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import ChessBoard from '@/components/ChessBoard';
 import { Link } from 'react-router-dom';
 import {
@@ -22,7 +23,7 @@ import {
 } from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { randomOpening, bookMove } from '@/lib/openings';
-import { movesToSAN, classifyMove, hasThreefold } from '@/lib/chessNotation';
+import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
 import { useToast } from '@/components/ui/use-toast';
 import { base44 } from '@/api/base44Client';
@@ -147,6 +148,7 @@ export default function Home() {
   const [showPro, setShowPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [started, setStarted] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   // AI vs AI agreed resignation: a lone-king side offers to resign and the
   // opponent accepts, shown to the spectator so they don't sit through a dead
   // 50-move grind. `autoResign` drives the visible offer→accept flow;
@@ -790,6 +792,55 @@ export default function Home() {
     }
     setUpgrading(false);
     toast({ title: 'Could not start donation', description: 'Please try again later.' });
+  }
+
+  // Email the finished game: capture the final board as an image, upload it,
+  // and send an HTML email (via the email-game backend function) with the
+  // board picture and a readable move list. Falls back to the user's own mail
+  // client (with the moves + an image link) if the direct send fails.
+  async function emailMoves() {
+    if (sendingEmail) return;
+    setSendingEmail(true);
+    const prevReview = reviewIdx;
+    if (prevReview !== null) setReviewIdx(null);
+    await new Promise((r) => setTimeout(r, 80));
+
+    let imageUrl = null;
+    try {
+      const grid = document.querySelector('.grid');
+      if (grid) {
+        const canvas = await html2canvas(grid, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false,
+          useCORS: true,
+        });
+        const dataUrl = canvas.toDataURL('image/png');
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], `truth-chess-${Date.now()}.png`, { type: 'image/png' });
+        const res = await base44.integrations.Core.UploadFile({ file });
+        imageUrl = res?.file_url || null;
+      }
+    } catch (e) {
+      imageUrl = null;
+    }
+
+    if (prevReview !== null) setReviewIdx(prevReview);
+
+    const to = me && me.email ? me.email : window.prompt('Enter the email address to send your game to:');
+    if (!to) { setSendingEmail(false); return; }
+
+    try {
+      await base44.functions.invoke('email-game', { to, sans: moveSanDisplay, resultStr, imageUrl });
+      toast({ title: 'Game emailed!', description: 'Check your inbox for the board image and moves.' });
+    } catch (e) {
+      const pgn = toPGN(moveSanDisplay, resultStr || '*');
+      const body = imageUrl ? `${pgn}\n\nView the final board: ${imageUrl}` : pgn;
+      window.location.href = `mailto:?subject=${encodeURIComponent('My Truth Chess Game')}&body=${encodeURIComponent(body)}`;
+      toast({ title: 'Opened your mail app', description: 'Direct send failed — moves and board link are ready to send.' });
+    } finally {
+      setSendingEmail(false);
+    }
   }
 
   async function refreshOpenGames() {
@@ -1686,7 +1737,7 @@ export default function Home() {
                 <CheckmateEstimate />
                 <MoveHistory sans={moveSanDisplay} />
                 {hasAccess ? (
-                  <ShareMoves sans={moveSanDisplay} resultStr={resultStr} />
+                  <ShareMoves sans={moveSanDisplay} resultStr={resultStr} onEmail={emailMoves} sending={sendingEmail} />
                 ) : canUpgrade ? (
                   <ShareMoves
                     sans={moveSanDisplay}
