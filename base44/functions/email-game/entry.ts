@@ -39,7 +39,9 @@ export default async function(req) {
       String(s)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
     const imgHtml = imageUrl
       ? `<div style="text-align:center;margin:18px 0;"><img src="${esc(imageUrl)}" alt="Final board position" style="max-width:100%;width:500px;border:10px solid #b89372;border-radius:14px;display:inline-block;"/></div>`
