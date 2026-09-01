@@ -10,6 +10,14 @@
       "type": "number",
       "default": 0,
       "description": "Number of games played on this date across all modes."
+    },
+    "ips": {
+      "type": "object",
+      "default": {},
+      "description": "Per-caller-IP-hash increment counts for this date, used to rate-limit public increments so a stranger can't inflate the counter. Hashed, not raw, for privacy.",
+      "additionalProperties": {
+        "type": "number"
+      }
     }
   },
   "required": [
