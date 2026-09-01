@@ -1545,9 +1545,9 @@ export default function Home() {
           <p className="text-center text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600/80">
             A Chess Variant
           </p>
-          <div className="relative mt-2 flex items-center justify-center">
-            <h1 className="inline-flex items-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800">
-              {maidenMode ? 'Truth Chess Maiden Mode' : 'Truth Chess'}
+          <div className="relative mt-2 flex flex-col items-center justify-center gap-2">
+            <h1 className="inline-flex items-center justify-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
+              {maidenMode ? 'TruthMaidenChess' : 'Truth Chess'}
               <svg
                 viewBox="0 0 24 24"
                 className="h-[0.85em] w-[0.85em] shrink-0"
@@ -1582,6 +1582,11 @@ export default function Home() {
                 </g>
               </svg>
             </h1>
+            {maidenMode && (
+              <p className="italic text-sm sm:text-base text-stone-500 max-w-xl text-center px-4">
+                in long ago days... where chess is just a short'd down story.
+              </p>
+            )}
             <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
               <Button
                 onClick={donate}
