@@ -1965,6 +1965,15 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <Link
+        to="/?maiden=1"
+        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 h-12 shadow-lg shadow-orange-500/30 transition-colors"
+        title="Play Truth Chess Maiden Mode"
+      >
+        <span>♀️</span>
+        <span className="text-sm">Maiden Mode</span>
+      </Link>
     </div>
   );
 }
