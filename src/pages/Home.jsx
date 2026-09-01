@@ -1515,7 +1515,7 @@ export default function Home() {
         flipped={effectiveFlipped}
         checkSquare={viewCheck}
         hintMove={reviewing ? null : hint}
-        boardTheme="classic"
+        boardTheme={maidenMode ? 'green' : 'classic'}
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}

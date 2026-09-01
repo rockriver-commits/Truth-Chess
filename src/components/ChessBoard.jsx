@@ -35,21 +35,37 @@ function Maiden({ color }) {
       className="w-[62%] h-[62%]"
       style={color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
     >
-      {/* flowing gown */}
+      {/* long golden hair flowing down the back */}
       <path
-        d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z"
+        d="M9 4 C5 6 4 11 4.5 17 C4.7 20 4 22 3.5 23 L9 23 C9.5 18 10 13 10.5 8 Z"
+        fill="#f5c518"
+        stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'}
+        strokeWidth="0.3"
+        opacity="0.95"
+      />
+      <path
+        d="M15 4 C19 6 20 11 19.5 17 C19.3 20 20 22 20.5 23 L15 23 C14.5 18 14 13 13.5 8 Z"
+        fill="#f5c518"
+        stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'}
+        strokeWidth="0.3"
+        opacity="0.95"
+      />
+      {/* hourglass gown — bust, cinched waist, flared hips */}
+      <path
+        d="M9 8 C8 10 10 12 10.5 13 C10.5 14 9.5 15 9 17 C8.5 19 6.5 21 6 23 L18 23 C17.5 21 15.5 19 15 17 C14.5 15 13.5 14 13.5 13 C14 12 16 10 15 8 Z"
         fill={fill}
         stroke={stroke}
         strokeWidth="0.6"
         strokeLinejoin="round"
       />
+      {/* bust shaping line */}
+      <path d="M9.4 9 C10 10.6 14 10.6 14.6 9" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.5" />
       {/* head */}
-      <circle cx="12" cy="4.4" r="2.5" fill={fill} stroke={stroke} strokeWidth="0.6" />
-      {/* flowing hair / veil on each side */}
-      <path d="M9.6 5.4 C7.2 7.5 6.6 12 7.2 15 L9 9 Z" fill={fill} opacity="0.85" />
-      <path d="M14.4 5.4 C16.8 7.5 17.4 12 16.8 15 L15 9 Z" fill={fill} opacity="0.85" />
+      <circle cx="12" cy="5" r="2.6" fill={fill} stroke={stroke} strokeWidth="0.6" />
+      {/* golden hair crown over the head */}
+      <path d="M9.6 4.4 C9 2.6 11 1.6 12 1.6 C13 1.6 15 2.6 14.4 4.4 C13.5 3.5 10.5 3.5 9.6 4.4 Z" fill="#f5c518" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.25" />
       {/* small gold tiara jewel */}
-      <circle cx="12" cy="2.4" r="0.9" fill="#facc15" stroke={stroke} strokeWidth="0.25" />
+      <circle cx="12" cy="2.3" r="0.9" fill="#facc15" stroke={color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)'} strokeWidth="0.2" />
     </svg>
   );
 }

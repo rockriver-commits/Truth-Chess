@@ -20,11 +20,16 @@ function TruthGlyph({ color }) {
 // fall through to the ♟ glyph).
 function MaidenGlyph({ color }) {
   const stroke = color === 'w' ? '#e2e8f0' : '#1f2937';
+  const gold = '#f5c518';
+  const goldEdge = color === 'w' ? 'rgba(120,80,0,0.5)' : 'rgba(0,0,0,0.4)';
   return (
     <svg viewBox="0 0 24 24" width="13" height="13" style={{ display: 'inline-block', verticalAlign: '-0.15em' }} aria-label="Maiden">
-      <path d="M12 5 C9 5 8 7 8 9 L6 23 L18 23 L16 9 C16 7 15 5 12 5 Z" fill={stroke} />
-      <circle cx="12" cy="4.4" r="2.5" fill={stroke} />
-      <circle cx="12" cy="2.4" r="0.9" fill="#facc15" />
+      <path d="M9 4 C5 6 4 11 4.5 17 C4.7 20 4 22 3.5 23 L9 23 C9.5 18 10 13 10.5 8 Z" fill={gold} stroke={goldEdge} strokeWidth="0.3" opacity="0.95" />
+      <path d="M15 4 C19 6 20 11 19.5 17 C19.3 20 20 22 20.5 23 L15 23 C14.5 18 14 13 13.5 8 Z" fill={gold} stroke={goldEdge} strokeWidth="0.3" opacity="0.95" />
+      <path d="M9 8 C8 10 10 12 10.5 13 C10.5 14 9.5 15 9 17 C8.5 19 6.5 21 6 23 L18 23 C17.5 21 15.5 19 15 17 C14.5 15 13.5 14 13.5 13 C14 12 16 10 15 8 Z" fill={stroke} />
+      <circle cx="12" cy="5" r="2.6" fill={stroke} />
+      <path d="M9.6 4.4 C9 2.6 11 1.6 12 1.6 C13 1.6 15 2.6 14.4 4.4 C13.5 3.5 10.5 3.5 9.6 4.4 Z" fill={gold} stroke={goldEdge} strokeWidth="0.25" />
+      <circle cx="12" cy="2.3" r="0.9" fill="#facc15" stroke={goldEdge} strokeWidth="0.2" />
     </svg>
   );
 }
