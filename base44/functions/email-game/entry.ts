@@ -7,7 +7,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 export default async function(req) {
   try {
     const body = await req.json().catch(() => ({}));
-    const to = typeof body.to === 'string' ? body.to.trim() : '';
     const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl : '';
     const sans = Array.isArray(body.sans) ? body.sans : [];
     const resultStr =
@@ -19,13 +18,6 @@ export default async function(req) {
       (process.env.WIX_CHECKOUT_APP_URL || '').trim().replace(/\/$/, '');
     const gameLink = appUrl ? `${appUrl}${maidenMode ? '/?maiden=1' : '/'}` : '';
     const gameTitle = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
-
-    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      return Response.json(
-        { error: 'A valid email address is required.' },
-        { status: 400 }
-      );
-    }
 
     let movetext = '';
     for (let i = 0; i < sans.length; i++) {
@@ -64,8 +56,16 @@ export default async function(req) {
     ].join('');
 
     const base44 = createClientFromRequest(req);
+    // Close the open email relay: this function's URL is public, so require an
+    // authenticated caller and send only to that caller's own email. A stranger
+    // can't invoke it, and a logged-in user can't email arbitrary third parties.
+    let caller = null;
+    try { caller = await base44.auth.me(); } catch { caller = null; }
+    if (!caller || !caller.email) {
+      return Response.json({ error: 'Authentication required.' }, { status: 401 });
+    }
     await base44.asServiceRole.integrations.Core.SendEmail({
-      to,
+      to: caller.email,
       subject: `My ${gameTitle} Game`,
       body: html,
       from_name: gameTitle,
