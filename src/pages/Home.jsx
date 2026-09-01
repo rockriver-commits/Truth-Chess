@@ -25,7 +25,7 @@ const _MAIDEN_MODE = (() => {
   }
 })();
 if (_MAIDEN_MODE) setVariant('maiden');
-if (_MAIDEN_MODE) { document.title = 'Truth Chess Maiden Mode'; }
+if (_MAIDEN_MODE) { document.title = 'TruthMaidin Chess'; }
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
 import {
   rollOpeningTarget,
@@ -213,7 +213,7 @@ export default function Home() {
   useEffect(() => {
     setVariant(maidenMode ? 'maiden' : 'classic');
     resetLocal();
-    document.title = maidenMode ? 'Truth Chess Maiden Mode' : 'Truth Chess';
+    document.title = maidenMode ? 'TruthMaidin Chess' : 'Truth Chess';
   }, [maidenMode]);
 
   // Stable identity for online play: registered users use their account;
@@ -1549,7 +1549,7 @@ export default function Home() {
           </p>
           <div className="relative mt-2 flex flex-col items-center justify-center gap-2">
             <h1 className="inline-flex items-center justify-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
-              {maidenMode ? 'TruthMaidenChess' : 'Truth Chess'}
+              {maidenMode ? 'TruthMaidin Chess' : 'Truth Chess'}
               <svg
                 viewBox="0 0 24 24"
                 className="h-[0.85em] w-[0.85em] shrink-0"
