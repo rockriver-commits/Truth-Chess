@@ -1548,9 +1548,10 @@ export default function Home() {
             A Chess Variant
           </p>
           <div className="relative mt-2 flex flex-col items-center justify-center gap-2">
-            <h1 className="inline-flex items-center justify-center gap-2 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
-              {maidenMode ? 'TruthMaidin Chess' : 'Truth Chess'}
-              <svg
+            <h1 className="flex flex-col items-center justify-center gap-1 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
+              <span className="inline-flex items-center justify-center gap-2">
+                {maidenMode ? 'TruthMaidin' : 'Truth Chess'}
+                <svg
                 viewBox="0 0 24 24"
                 className="h-[0.85em] w-[0.85em] shrink-0"
                 role="img"
@@ -1583,6 +1584,10 @@ export default function Home() {
                   <circle cx="12" cy="8.5" r="2.6" fill="url(#tcJewel)" stroke="#0f172a" strokeWidth="0.4" />
                 </g>
               </svg>
+              </span>
+              {maidenMode && (
+                <span className="text-lg sm:text-xl font-medium tracking-[0.25em] text-stone-500">Chess</span>
+              )}
             </h1>
             {maidenMode && (
               <p className="italic text-sm sm:text-base text-stone-500 max-w-xl text-center px-4">
