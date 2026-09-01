@@ -1704,15 +1704,6 @@ export default function Home() {
                     {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                     Sound
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={donate}
-                    disabled={upgrading}
-                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur text-stone-900 justify-start gap-2"
-                  >
-                    💛 Support — $5
-                  </Button>
                 </div>
               </div>
               <div className="order-first sm:order-none flex flex-col items-center min-w-0 flex-1 w-full">
@@ -1858,6 +1849,17 @@ export default function Home() {
         <div className="mt-8 space-y-6">
           {me && <StatsPanel userId={me.id} />}
           <Leaderboard />
+        </div>
+
+        <div className="flex justify-center mt-6">
+          <Button
+            onClick={donate}
+            disabled={upgrading}
+            variant="outline"
+            className="h-9 px-4 text-sm bg-white/90 backdrop-blur text-stone-900 gap-2"
+          >
+            💛 Support — $5
+          </Button>
         </div>
 
       </div>
