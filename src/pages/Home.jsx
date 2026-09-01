@@ -76,21 +76,23 @@ function fmtTime(s) {
 }
 
 // AI vs AI auto-resign trigger: a side reduced to only a king while the
-// opponent still has at least 2 pieces (any kind) is a lost cause — the
-// lone-king side is the "loser" who will offer to resign so spectators don't
-// watch the 50-move rule grind out.
+// opponent can force mate — either 2+ pieces of any kind, or a single queen
+// or rook — is a lost cause. The lone-king side offers to resign so spectators
+// don't watch the 50-move rule grind out. (A single bishop, knight, or pawn
+// can't force mate, so those stay as playable draws.)
 function loneKingLoser(state) {
-  let wAll = 0, bAll = 0;
+  let wAll = 0, bAll = 0, wMajors = 0, bMajors = 0;
   for (let r = 0; r < 9; r++) {
     for (let f = 0; f < 10; f++) {
       const p = state.board[r][f];
       if (!p || p.type === 'K') continue;
-      if (p.color === 'w') wAll++;
-      else bAll++;
+      const major = p.type === 'Q' || p.type === 'R';
+      if (p.color === 'w') { wAll++; if (major) wMajors++; }
+      else { bAll++; if (major) bMajors++; }
     }
   }
-  if (wAll === 0 && bAll >= 2) return 'w';
-  if (bAll === 0 && wAll >= 2) return 'b';
+  if (wAll === 0 && (bAll >= 2 || bMajors >= 1)) return 'w';
+  if (bAll === 0 && (wAll >= 2 || wMajors >= 1)) return 'b';
   return null;
 }
 
