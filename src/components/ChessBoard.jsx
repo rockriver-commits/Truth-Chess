@@ -25,13 +25,13 @@ function Cross({ color }) {
 
 // A small gold unicorn horn sitting on the knight's crown. Sized to fit
 // entirely within the piece's em box (no overflow, no glyph resize).
-function KnightHorn({ color }) {
+function KnightHorn({ color, left = '38%', top = '-0.2em', rotate = -38 }) {
   const edge = color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(0,0,0,0.6)';
   return (
     <svg
       viewBox="0 0 24 24"
       className="absolute pointer-events-none"
-      style={{ left: '38%', top: '-0.2em', transform: 'translateX(-50%) rotate(-38deg)', width: '0.22em', height: '0.42em' }}
+      style={{ left, top, transform: `translateX(-50%) rotate(${rotate}deg)`, width: '0.22em', height: '0.42em' }}
       aria-hidden="true"
     >
       <polygon points="12,1 8.5,23 15.5,23" fill="#fbbf24" stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
@@ -88,7 +88,12 @@ export default function ChessBoard({
         }}
       >
         {pieceStyle === 'letter' ? LETTERS[piece.type] : GLYPHS[piece.type]}
-        {piece.type === 'N' && pieceStyle !== 'letter' && <KnightHorn color={piece.color} />}
+        {piece.type === 'N' && pieceStyle !== 'letter' && (
+          <>
+            <KnightHorn color={piece.color} left="38%" top="-0.2em" rotate={-38} />
+            <KnightHorn color={piece.color} left="30%" top="-0.13em" rotate={-38} />
+          </>
+        )}
       </span>
     );
   };
