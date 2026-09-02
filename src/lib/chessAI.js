@@ -96,6 +96,27 @@ function leavesMajorEnPriseToPawn(state, move, color) {
   return false;
 }
 
+// A major piece (Q/R/N/B) giving check that the opponent can capture for
+// material is a piece giveaway — filtered from the root list. Truth checkers
+// are already covered by isUnguardedTruthNearKing (only a King or Truth can
+// capture one). Exceptions: the check is actually checkmate, or capturing the
+// hanging checker is the opponent's ONLY legal reply (a forced capture), or
+// every root move is filtered (last-resort fallback in bestMove).
+function isHangingMajorCheck(state, move, color) {
+  const pt = move.piece.type;
+  if (pt !== 'Q' && pt !== 'R' && pt !== 'N' && pt !== 'B') return false;
+  const ns = makeMove(state, move);
+  const opp = color === 'w' ? 'b' : 'w';
+  if (!inCheck(ns, opp)) return false;
+  const replies = allLegalMoves(ns, opp);
+  if (replies.length === 0) return false; // checkmate — always played
+  const [tr, tf] = move.to;
+  const captures = replies.filter((rm) => rm.captured && rm.to[0] === tr && rm.to[1] === tf);
+  if (!captures.some((rm) => see(ns, rm) > 0)) return false;
+  if (replies.length === 1) return false; // the free capture is the opponent's only move
+  return true;
+}
+
 // Move offsets for the attack map (kept local so we don't import engine internals).
 const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const BISHOP_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -878,11 +899,13 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   // any pawn grab that loses material in the exchange is dropped, and an
   // unguarded Truth never steps next to the enemy King. A move that would let
   // an enemy pawn win one of our majors (Q/R/N/B) is dropped too, so the
-  // attacked piece takes the pawn fairly or steps out of the attack. All
-  // filters yield only as a last resort: if every legal move is filtered,
-  // the original list is used so a move is always played.
+  // attacked piece takes the pawn fairly or steps out of the attack. And a
+  // Q/R/N/B check that the opponent can capture for material is dropped
+  // unless the capture is the opponent's only legal reply. All filters yield
+  // only as a last resort: if every legal move is filtered, the original
+  // list is used so a move is always played.
   const safeRoot = moves.filter(
-    (m) => !isBadPawnGrab(state, m) && !isUnguardedTruthNearKing(state, m, color) && !leavesMajorEnPriseToPawn(state, m, color)
+    (m) => !isBadPawnGrab(state, m) && !isUnguardedTruthNearKing(state, m, color) && !leavesMajorEnPriseToPawn(state, m, color) && !isHangingMajorCheck(state, m, color)
   );
   const rootMoves = safeRoot.length ? safeRoot : moves;
 
