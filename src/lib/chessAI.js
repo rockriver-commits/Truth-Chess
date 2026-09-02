@@ -716,11 +716,11 @@ function pickNonDrawing(state, preferred, ordered, positionKeys) {
 }
 
 // --- Pawn-grab safety (root move filter) ---------------------------------
-// Valuable pieces (N/B/R/Q) should not grab defended pawns that lose material
-// — a knight taking a pawn only to be recaptured by a rook trades a minor for
-// a pawn. The engine avoids such grabs at the root unless that's all there is.
-// Truth is excluded (it never captures ordinary pieces), and a capturer that
-// is already under attack is allowed to salvage a pawn.
+// Major pieces (Q/R/N/B/T) never trade down for a pawn: any pawn grab that
+// loses material in the ensuing exchange (e.g. a knight taking a pawn only to
+// be recaptured by a rook) is filtered from the root move list. The only
+// exception is a last resort — when every legal move is such a grab, the
+// fallback in bestMove plays one anyway.
 
 function leastValuableAttacker(board, tr, tf, color) {
   const pdir = color === 'w' ? 1 : -1; // a white pawn attacking (tr,tf) sits at tr+1
@@ -798,13 +798,10 @@ function see(state, move) {
   return a[0] - f[1];
 }
 
-function isBadPawnGrab(state, move, opp) {
+function isBadPawnGrab(state, move) {
   if (!move.captured || move.captured.type !== 'P') return false;
   const pt = move.piece.type;
-  if (pt !== 'N' && pt !== 'B' && pt !== 'R' && pt !== 'Q') return false;
-  // A capturer already under attack may salvage a pawn — only filter grabs
-  // that initiate a losing exchange from a safe square.
-  if (isSquareAttacked(state.board, move.from[0], move.from[1], opp)) return false;
+  if (pt !== 'N' && pt !== 'B' && pt !== 'R' && pt !== 'Q' && pt !== 'T') return false;
   return see(state, move) < 0;
 }
 
@@ -829,13 +826,12 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   const moves = allLegalMoves(state, color);
   if (moves.length === 0) return null;
 
-  // Root move filter: valuable pieces (N/B/R/Q) must not grab defended pawns
-  // that lose material (a knight taking a pawn only to be recaptured by a
-  // rook trades a minor for a pawn). Such grabs are dropped from the root
-  // move list unless every move is one. Truth is excluded; a capturer already
-  // under attack may salvage a pawn.
-  const oppCol = color === 'w' ? 'b' : 'w';
-  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m, oppCol) && !isUnguardedTruthNearKing(state, m, color));
+  // Root move filter: major pieces (Q/R/N/B/T) never trade down for a pawn —
+  // any pawn grab that loses material in the exchange is dropped, and an
+  // unguarded Truth never steps next to the enemy King. Both filters yield
+  // only as a last resort: if every legal move is filtered, the original
+  // list is used so a move is always played.
+  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m) && !isUnguardedTruthNearKing(state, m, color));
   const rootMoves = safeRoot.length ? safeRoot : moves;
 
   // Mate book (with mirrored fallback): a forced mate-in-1 is always sound to
