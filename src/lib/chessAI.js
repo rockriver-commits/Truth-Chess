@@ -48,6 +48,54 @@ function isUnguardedTruthNearKing(state, move, color) {
   return isHangingCheck(ns.board, move, color);
 }
 
+// A Truth capturing the opposing Truth is FREE when nothing can recapture it:
+// no enemy Truth slides at the landing square and the enemy King is not
+// adjacent. The AI always plays such a capture (pure material, ~350).
+function isFreeTruthCapture(state, move, color) {
+  if (move.piece.type !== 'T' || !move.captured || move.captured.type !== 'T') return false;
+  const ns = makeMove(state, move);
+  const [tr, tf] = move.to;
+  const opp = color === 'w' ? 'b' : 'w';
+  if (truthAttacksSquare(ns.board, tr, tf, opp)) return false;
+  const kpos = findKing(ns.board, opp);
+  if (kpos && chebyshev(kpos, [tr, tf]) === 1) return false;
+  return true;
+}
+
+// A move "leaves a major en prise" when, after it, the opponent has a LEGAL
+// pawn capture of one of our majors (Q/R/N/B — pawns can never capture a
+// Truth) that wins material in the exchange. Such moves are filtered from the
+// root list, so an attacked major either takes the pawn fairly, the pawn is
+// dealt with, or the major steps out of the pawn's attack. Only a last resort
+// (every move filtered) allows leaving a major to be taken.
+function leavesMajorEnPriseToPawn(state, move, color) {
+  const ns = makeMove(state, move);
+  const opp = color === 'w' ? 'b' : 'w';
+  const pr = opp === 'w' ? 1 : -1; // enemy pawn sits on this side of its target
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = ns.board[r][f];
+      if (!p || p.color !== color) continue;
+      if (p.type !== 'Q' && p.type !== 'R' && p.type !== 'N' && p.type !== 'B') continue;
+      for (const df of [-1, 1]) {
+        const ar = r + pr, af = f + df;
+        if (ar < 0 || ar >= RANKS || af < 0 || af >= FILES) continue;
+        const ap = ns.board[ar][af];
+        if (!ap || ap.type !== 'P' || ap.color !== opp) continue;
+        // The pawn capture must be legal for the opponent (pins or an
+        // unresolved check make it a non-threat) and must win material.
+        const b = cloneBoard(ns.board);
+        b[ar][af] = null;
+        b[r][f] = { type: 'P', color: opp };
+        if (inCheck({ ...ns, board: b }, opp)) continue;
+        const pawnMove = { from: [ar, af], to: [r, f], piece: { type: 'P', color: opp }, captured: { type: p.type, color } };
+        if (see(ns, pawnMove) > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Move offsets for the attack map (kept local so we don't import engine internals).
 const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const BISHOP_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -828,10 +876,14 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
 
   // Root move filter: major pieces (Q/R/N/B/T) never trade down for a pawn —
   // any pawn grab that loses material in the exchange is dropped, and an
-  // unguarded Truth never steps next to the enemy King. Both filters yield
-  // only as a last resort: if every legal move is filtered, the original
-  // list is used so a move is always played.
-  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m) && !isUnguardedTruthNearKing(state, m, color));
+  // unguarded Truth never steps next to the enemy King. A move that would let
+  // an enemy pawn win one of our majors (Q/R/N/B) is dropped too, so the
+  // attacked piece takes the pawn fairly or steps out of the attack. All
+  // filters yield only as a last resort: if every legal move is filtered,
+  // the original list is used so a move is always played.
+  const safeRoot = moves.filter(
+    (m) => !isBadPawnGrab(state, m) && !isUnguardedTruthNearKing(state, m, color) && !leavesMajorEnPriseToPawn(state, m, color)
+  );
   const rootMoves = safeRoot.length ? safeRoot : moves;
 
   // Mate book (with mirrored fallback): a forced mate-in-1 is always sound to
@@ -842,6 +894,21 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   if (bookHit && bookHit.mateIn === 1) {
     setPersistentBestMove(state, bookHit.move);
     return bookHit.move; // a forced mate is never a draw
+  }
+
+  // Forced tactic: a Truth capturing the opposing Truth for free is always
+  // played — nothing can recapture it — unless another move mates at once.
+  const freeTruthCapture = rootMoves.find((m) => isFreeTruthCapture(state, m, color));
+  if (freeTruthCapture) {
+    const opp0 = color === 'w' ? 'b' : 'w';
+    const mateInOne = moves.some((m) => {
+      const ns = makeMove(state, m);
+      return inCheck(ns, opp0) && allLegalMoves(ns, opp0).length === 0;
+    });
+    if (!mateInOne) {
+      setPersistentBestMove(state, freeTruthCapture);
+      return freeTruthCapture;
+    }
   }
 
   // Position keys so far (including the current position) for threefold
