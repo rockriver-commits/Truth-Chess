@@ -157,6 +157,9 @@ export default function Home() {
   // `cvcResignResult` ends the game.
   const [autoResign, setAutoResign] = useState(null);
   const [cvcResignResult, setCvcResignResult] = useState(null);
+  // Resetting an in-progress game shows a confirmation popup because it
+  // counts as a resignation (the game is recorded as a loss before resetting).
+  const [resetConfirm, setResetConfirm] = useState(false);
   // Deep training mode: counts consecutive self-play games played this session.
   const [trainingGames, setTrainingGames] = useState(0);
   // Engine Training card: chosen game count + search depth, plus an active flag
@@ -508,6 +511,32 @@ export default function Home() {
     if ((mode !== 'local' && mode !== 'computer') || gameOver) return;
     setDrawAgreed(true);
     playSound('mate');
+  }
+
+  // Resetting an in-progress game counts as a resignation: confirm with a
+  // popup so the player knows the current game is recorded as a loss before
+  // the board resets to a fresh one. Idle / finished games reset directly.
+  function handleReset() {
+    const humanInProgress =
+      started &&
+      !gameOver &&
+      (mode === 'local' || mode === 'computer' || (mode === 'online' && onlineGame?.status === 'active' && !spectator && myColor));
+    if (!humanInProgress) {
+      if (mode === 'online') resetOnline();
+      else resetLocal();
+      return;
+    }
+    setResetConfirm(true);
+  }
+
+  function confirmReset() {
+    setResetConfirm(false);
+    if (mode === 'online') {
+      resetOnline();
+      return;
+    }
+    setResigned(true);
+    setTimeout(() => resetLocal(), 900);
   }
 
   function showHint() {
@@ -1745,7 +1774,7 @@ export default function Home() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={mode === 'online' ? resetOnline : resetLocal}
+                    onClick={handleReset}
                     className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -2016,6 +2045,21 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-2">
               <Button onClick={stay} variant="outline">Stay</Button>
               <Button onClick={advance}>Level {Math.min(10, difficulty + 1)}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+            <p className="text-lg font-semibold text-stone-800">Reset = resignation</p>
+            <p className="text-sm text-stone-500 mt-2 mb-5">
+              Resetting now will count this game as a loss (resignation), then start a fresh one. Continue?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={() => setResetConfirm(false)} variant="outline">Cancel</Button>
+              <Button onClick={confirmReset} className="bg-rose-600 hover:bg-rose-700 text-white">Reset & resign</Button>
             </div>
           </div>
         </div>
