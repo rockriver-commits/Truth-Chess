@@ -38,6 +38,16 @@ function isHangingCheck(board, move, color) {
   return !isSquareAttacked(b, tr, tf, color);
 }
 
+// A Truth piece moved adjacent to the enemy King without being guarded is just
+// a free capture for the King (the Truth can be taken by the opposing King).
+// The AI never plays such a move at the root unless every move is one. Standard
+// rules are unchanged — this is an engine move-quality filter only.
+function isUnguardedTruthNearKing(state, move, color) {
+  if (move.piece.type !== 'T') return false;
+  const ns = makeMove(state, move);
+  return isHangingCheck(ns.board, move, color);
+}
+
 // Move offsets for the attack map (kept local so we don't import engine internals).
 const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const BISHOP_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -825,7 +835,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   // move list unless every move is one. Truth is excluded; a capturer already
   // under attack may salvage a pawn.
   const oppCol = color === 'w' ? 'b' : 'w';
-  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m, oppCol));
+  const safeRoot = moves.filter((m) => !isBadPawnGrab(state, m, oppCol) && !isUnguardedTruthNearKing(state, m, color));
   const rootMoves = safeRoot.length ? safeRoot : moves;
 
   // Mate book (with mirrored fallback): a forced mate-in-1 is always sound to
