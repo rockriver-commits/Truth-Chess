@@ -112,6 +112,20 @@ function chebyshev(a, b) {
   return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
 }
 
+// Per-piece weight for the king-march term: pawns lead the charge toward the
+// enemy king, knights/bishops follow, and rooks/queens (which operate at
+// range) get a smaller nudge so they don't abandon their lines.
+function marchWeightFor(type) {
+  switch (type) {
+    case 'P': return 1.0;
+    case 'N': return 0.8;
+    case 'B': return 0.8;
+    case 'R': return 0.5;
+    case 'Q': return 0.6;
+    default: return 0.5;
+  }
+}
+
 // Build per-color attack maps: for each square, the minimum value of an enemy
 // piece attacking it (1 = the king). Used by the hanging-piece safety term.
 function buildAttackMap(board) {
@@ -407,6 +421,37 @@ function evaluate(board) {
       const oppSide = t[0] > rc ? 1 : 0; // in white's half
       const central = 4.5 - Math.abs(t[1] - fc);
       score -= opPhase * oppSide * central * 3 * TRUTH_BLOCK_BOOST;
+    }
+  }
+
+  // --- King march ---------------------------------------------------------
+  // Collective king-hunt: every non-king piece's primary goal is to advance
+  // toward the enemy king and threaten check. Reward each piece for being
+  // closer to the enemy king (more so in the middlegame, when the whole army
+  // should converge; the dedicated endgame mating-drive term above takes
+  // over as the position simplifies). Pawns lead the charge; rooks/queens,
+  // which operate at range, get a smaller nudge so they don't abandon lines.
+  {
+    const marchW = 3 * mg + 1.5 * egPhase;
+    if (bK) {
+      for (const e of wPc) {
+        const d = chebyshev(e.pos, bK);
+        if (d > 0) score += (9 - d) * marchW * marchWeightFor(e.type);
+      }
+      for (const t of wT) {
+        const d = chebyshev(t, bK);
+        if (d > 0) score += (9 - d) * marchW * 0.6;
+      }
+    }
+    if (wK) {
+      for (const e of bPc) {
+        const d = chebyshev(e.pos, wK);
+        if (d > 0) score -= (9 - d) * marchW * marchWeightFor(e.type);
+      }
+      for (const t of bT) {
+        const d = chebyshev(t, wK);
+        if (d > 0) score -= (9 - d) * marchW * 0.6;
+      }
     }
   }
 
