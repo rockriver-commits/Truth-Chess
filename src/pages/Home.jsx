@@ -1273,8 +1273,10 @@ export default function Home() {
           positionKeys: positionList.map((p) => positionKey(p.state)),
         };
         move = bestMove(localState, computerColor, difficulty, false, ctx);
-        if (move) move = pickNonRepeating(localState, move, localMoves);
       }
+      // Always avoid threefold repetition (unless no other legal move avoids
+      // it), even for opening-book moves.
+      if (move) move = pickNonRepeating(localState, move, localMoves);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, 350);
@@ -1346,8 +1348,10 @@ export default function Home() {
         };
         const searchDepth = trainingActive ? trainingDepth : mode === 'cvc_turbo' ? 3 : 7;
         move = bestMove(localState, localState.turn, searchDepth, true, ctx);
-        if (move) move = pickNonRepeating(localState, move, localMoves);
       }
+      // Always avoid threefold repetition (unless no other legal move avoids
+      // it), even for opening-book moves.
+      if (move) move = pickNonRepeating(localState, move, localMoves);
       if (move) commitMove(move, 'Q');
       setThinking(false);
     }, delay);
