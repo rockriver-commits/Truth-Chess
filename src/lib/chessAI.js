@@ -829,13 +829,19 @@ function negamax(state, color, depth, alpha, beta, ply) {
     const isQuiet = !m.captured && !m.promotion && m !== ttMove;
     // Late-move reductions: quiet moves searched late get a shallower look,
     // with a full re-search if they surprisingly beat alpha.
-    const lmr = isQuiet && depth >= 3 && searched >= 3 && !givesCheck ? 1 : 0;
     let sc;
-    if (lmr) {
-      sc = -negamax(ns, opp, depth - 1 + ext - 1, -alpha - 1, -alpha, ply + 1);
-      if (!timedOut && sc > alpha) sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
-    } else {
+    if (searched === 0) {
+      // Principal variation search: the first (best-ordered) move gets a full
+      // window; every later move is first probed with a cheap null window and
+      // only re-searched wider if it unexpectedly beats alpha.
       sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
+    } else {
+      // Late-move reductions: quiet moves searched late get a shallower null-
+      // window look first; a surprise alpha-raise triggers the deeper search.
+      const lmr = isQuiet && depth >= 3 && searched >= 3 && !givesCheck ? 1 : 0;
+      sc = -negamax(ns, opp, depth - 1 + ext - lmr, -alpha - 1, -alpha, ply + 1);
+      if (!timedOut && sc > alpha && lmr) sc = -negamax(ns, opp, depth - 1 + ext, -alpha - 1, -alpha, ply + 1);
+      if (!timedOut && sc > alpha && sc < beta) sc = -negamax(ns, opp, depth - 1 + ext, -beta, -alpha, ply + 1);
     }
     if (timedOut) break;
     if (givesCheck) {
