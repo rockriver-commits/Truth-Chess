@@ -17,6 +17,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
+import VisitorCounter from '@/components/VisitorCounter';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -43,7 +44,9 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
-    <Routes>
+    <>
+      <VisitorCounter />
+      <Routes>
       {/* Add your page Route elements here */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -54,7 +57,8 @@ const AuthenticatedApp = () => {
       <Route path="/feedback" element={<Feedback />} />
       <Route path="/ThankYou" element={<ThankYou />} />
       <Route path="*" element={<PageNotFound />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
 

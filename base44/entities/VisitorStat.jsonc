@@ -1,0 +1,48 @@
+{
+  "name": "VisitorStat",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "description": "Local calendar date in YYYY-MM-DD form; the day's counter key."
+    },
+    "count": {
+      "type": "number",
+      "default": 0,
+      "description": "Distinct visitors (caller-IP hashes) seen on this date."
+    },
+    "ips": {
+      "type": "object",
+      "default": {},
+      "description": "Per-caller-IP-hash presence marks for this date so each visitor counts once per day. Hashed, not raw, for privacy.",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
+  },
+  "required": [
+    "date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
