@@ -25,6 +25,7 @@ import {
 } from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
 import { saveGame, loadSavedGame } from '@/lib/gamePersistence';
+import { parseGameNotation } from '@/lib/sanParser';
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
@@ -42,11 +43,12 @@ import { isMobileApp } from '@/lib/isMobileApp';
 import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
+import ImportGameDialog from '@/components/ImportGameDialog';
 import ResignFlowBanner from '@/components/ResignFlowBanner';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
-import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Users, Computer, Globe, Bot, RotateCcw, Download, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 import EngineTraining from '@/components/EngineTraining';
 import TournamentPanel from '@/components/TournamentPanel';
@@ -205,6 +207,8 @@ export default function Home() {
   // Resetting an in-progress game shows a confirmation popup because it
   // counts as a resignation (the game is recorded as a loss before resetting).
   const [resetConfirm, setResetConfirm] = useState(false);
+  // Paste-a-game import dialog: recreate a game from notation on the board.
+  const [showImport, setShowImport] = useState(false);
   // Deep training mode: counts consecutive self-play games played this session.
   const [trainingGames, setTrainingGames] = useState(0);
   // Engine Training card: chosen game count + search depth, plus an active flag
@@ -599,6 +603,60 @@ export default function Home() {
     }
     setResigned(true);
     setTimeout(() => resetLocal(), 900);
+  }
+
+  // Import a game from PGN/SAN notation: recreate it on the board in vs
+  // Computer mode and hand the next move to Zveritas — the human plays the
+  // color that is NOT on move. Returns an error string, or null on success.
+  function importGame(text) {
+    let moves;
+    try {
+      moves = parseGameNotation(text);
+    } catch (e) {
+      return e.message;
+    }
+    if (!moves.length) return 'No moves found in that notation.';
+    const positions = replayStates(moves);
+    const last = positions[positions.length - 1];
+    leaveOnline();
+    if (trainingActive) {
+      setTrainingActive(false);
+      setSoundOn(prevSoundRef.current);
+    }
+    cleanupComputerBroadcast();
+    setMode('computer');
+    setLocalMoves(moves);
+    setLocalState(last.state);
+    setLocalCaptured(last.captured || { w: [], b: [] });
+    setLocalLastMove(last.lastMove || null);
+    setHistory(positions.slice(0, -1));
+    setSelected(null);
+    setLegalMoves([]);
+    setPromo(null);
+    setHint(null);
+    setHintLoading(false);
+    setResigned(false);
+    setDrawAgreed(false);
+    setTimedOut(null);
+    setCvcResignResult(null);
+    setReviewIdx(null);
+    setPendingAdvance(false);
+    setStarted(true);
+    setStartMs(Date.now());
+    setElapsed(0);
+    // Zveritas plays the side on move; the human takes the other color.
+    setPlayerColor(last.state.turn === 'w' ? 'b' : 'w');
+    wonAsBlackRef.current = false;
+    openingRef.current = { book: { moves: [] }, wTarget: null, bTarget: null };
+    recordedRef.current = false;
+    const tc = TIME_CONTROLS[timeControl];
+    setWhiteClock(tc.initial);
+    setBlackClock(tc.initial);
+    toast({
+      title: 'Game imported',
+      description: `${Math.ceil(moves.length / 2)} moves loaded — Zveritas plays ${last.state.turn === 'w' ? 'White' : 'Black'}.`,
+    });
+    return null;
   }
 
   function showHint() {
@@ -1943,6 +2001,15 @@ export default function Home() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => setShowImport(true)}
+                    className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Import game
+                  </Button>
+                  <Button
+                    size="sm"
                     variant={soundOn ? 'default' : 'outline'}
                     onClick={() => setSoundOn((s) => !s)}
                     className="h-8 px-3 text-xs bg-white/90 backdrop-blur text-stone-900 justify-start gap-2"
@@ -2153,6 +2220,12 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <ImportGameDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onSubmit={importGame}
+      />
 
       {promo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
