@@ -369,7 +369,7 @@ export async function recordGameResult(positionList, result) {
 // server so tuned weights carry across sessions and devices.
 const EVAL_KEY = 'tc-eval-weights';
 export const DEFAULT_EVAL_WEIGHTS = {
-  kingSafety: 1, contempt: 1, truthHunt: 1, center: 1, passedPawn: 1,
+  kingSafety: 1, contempt: 1, truthHunt: 1, center: 1, passedPawn: 1, structure: 1,
 };
 const EVAL_MIN = 0.5;
 const EVAL_MAX = 2.0;
@@ -405,7 +405,7 @@ export function tuneEvalWeights(positionList, result) {
     const st = positionList[i].state;
     const side = st.turn;
     // Which term to nudge: rotate by index so each gets attention over time.
-    const terms = ['kingSafety', 'contempt', 'truthHunt', 'center', 'passedPawn'];
+    const terms = ['kingSafety', 'contempt', 'truthHunt', 'center', 'passedPawn', 'structure'];
     const term = terms[i % terms.length];
     const expected = result === 'draw' ? 0 : (result === side ? 1 : -1);
     // If the side to move won, a higher eval for that side is "right". We

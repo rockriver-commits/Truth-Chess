@@ -159,18 +159,35 @@ const ZO = (() => {
     }
   }
   t.turn = r();
+  // Castling rights and the en-passant file are part of a position's identity:
+  // two boards that look identical but differ in either must never share a
+  // transposition-table entry. (The old hash ignored them — its correctness
+  // gap — so a wrong score or move could be reused across genuinely
+  // different positions.)
+  t.castle = { wK: r(), wQ: r(), bK: r(), bQ: r() };
+  t.epFile = new Uint32Array(FILES);
+  for (let f = 0; f < FILES; f++) t.epFile[f] = r();
   return t;
 })();
 
-function hashState(board, turn) {
+function hashState(state) {
   let h = 0;
+  const board = state.board;
   for (let r = 0; r < RANKS; r++) {
     for (let f = 0; f < FILES; f++) {
       const p = board[r][f];
       if (p) h = (h ^ ZO[p.color + p.type][r * FILES + f]) >>> 0;
     }
   }
-  if (turn === 'b') h = (h ^ ZO.turn) >>> 0;
+  if (state.turn === 'b') h = (h ^ ZO.turn) >>> 0;
+  const c = state.castling;
+  if (c) {
+    if (c.w && c.w.K) h = (h ^ ZO.castle.wK) >>> 0;
+    if (c.w && c.w.Q) h = (h ^ ZO.castle.wQ) >>> 0;
+    if (c.b && c.b.K) h = (h ^ ZO.castle.bK) >>> 0;
+    if (c.b && c.b.Q) h = (h ^ ZO.castle.bQ) >>> 0;
+  }
+  if (state.ep) h = (h ^ ZO.epFile[state.ep[1]]) >>> 0;
   return h;
 }
 
@@ -288,6 +305,25 @@ function evaluate(board) {
       if (p.color === 'w') { wMat += val; if (p.type === 'Q' || p.type === 'R') wMaj++; }
       else { bMat += val; if (p.type === 'Q' || p.type === 'R') bMaj++; }
     }
+  }
+
+  // Dead-draw knowledge (tablebase-class): if neither side can ever deliver
+  // checkmate — no pawn, rook, queen, or Truth remains, and each side has at
+  // most one minor piece — the position is a certain draw. Score it exactly 0
+  // so the engine stops grinding hopeless endings.
+  {
+    let wMinor = 0, bMinor = 0, wCanMate = false, bCanMate = false;
+    for (const e of wPc) {
+      if (e.type === 'N' || e.type === 'B') wMinor++;
+      else wCanMate = true; // P/R/Q — T is tracked separately below
+    }
+    for (const e of bPc) {
+      if (e.type === 'N' || e.type === 'B') bMinor++;
+      else bCanMate = true;
+    }
+    if (wT.length) wCanMate = true;
+    if (bT.length) bCanMate = true;
+    if (!wCanMate && !bCanMate && wMinor <= 1 && bMinor <= 1) return 0;
   }
 
   // Endgame phase: 0 (opening) → 1 (deep endgame). ~2600 ≈ two rooks + minor.
@@ -469,6 +505,67 @@ function evaluate(board) {
     }
   }
 
+  // --- Pawn structure & piece placement ------------------------------------
+  // Classic evaluation terms: doubled/isolated pawns are weaknesses, rooks
+  // belong on open or semi-open files, and a bishop is "bad" when its own
+  // pawns (which it can never jump) sit on its square color. Scaled by the
+  // tunable structure weight (Texel-style self-tuning).
+  {
+    const sw = curWeights.structure;
+    const wPawnFiles = new Array(FILES).fill(0);
+    const bPawnFiles = new Array(FILES).fill(0);
+    let wPawnLight = 0, bPawnLight = 0; // own pawns on light squares ((r+f)%2===0)
+    for (let r = 0; r < RANKS; r++) {
+      for (let f = 0; f < FILES; f++) {
+        const p = board[r][f];
+        if (!p || p.type !== 'P') continue;
+        if (p.color === 'w') {
+          wPawnFiles[f]++;
+          if ((r + f) % 2 === 0) wPawnLight++;
+        } else {
+          bPawnFiles[f]++;
+          if ((r + f) % 2 === 0) bPawnLight++;
+        }
+      }
+    }
+    const wPawnDark = wPawnFiles.reduce((a, b) => a + b, 0) - wPawnLight;
+    const bPawnDark = bPawnFiles.reduce((a, b) => a + b, 0) - bPawnLight;
+    for (let f = 0; f < FILES; f++) {
+      // Doubled pawns: only the front one is really worth a pawn.
+      if (wPawnFiles[f] > 1) score -= (wPawnFiles[f] - 1) * 12 * sw;
+      if (bPawnFiles[f] > 1) score += (bPawnFiles[f] - 1) * 12 * sw;
+      // Isolated pawns: no friendly pawn on an adjacent file to defend them.
+      const wIso = wPawnFiles[f] > 0
+        && (f === 0 || wPawnFiles[f - 1] === 0) && (f === FILES - 1 || wPawnFiles[f + 1] === 0);
+      const bIso = bPawnFiles[f] > 0
+        && (f === 0 || bPawnFiles[f - 1] === 0) && (f === FILES - 1 || bPawnFiles[f + 1] === 0);
+      if (wIso) score -= wPawnFiles[f] * 14 * sw;
+      if (bIso) score += bPawnFiles[f] * 14 * sw;
+    }
+    for (let r = 0; r < RANKS; r++) {
+      for (let f = 0; f < FILES; f++) {
+        const p = board[r][f];
+        if (!p) continue;
+        if (p.type === 'R') {
+          // Rooks love open files (no pawns at all) and like semi-open files
+          // (no own pawn in the way).
+          const own = p.color === 'w' ? wPawnFiles : bPawnFiles;
+          const enemy = p.color === 'w' ? bPawnFiles : wPawnFiles;
+          const v = enemy[f] === 0 ? (own[f] === 0 ? 30 : 15) : 0;
+          score += p.color === 'w' ? v * sw : -v * sw;
+        } else if (p.type === 'B') {
+          // Bad bishop: own pawns on its square color block its diagonals.
+          const light = (r + f) % 2 === 0;
+          const ownSame = p.color === 'w'
+            ? (light ? wPawnLight : wPawnDark)
+            : (light ? bPawnLight : bPawnDark);
+          const v = ownSame * 6 * sw;
+          score += p.color === 'w' ? -v : v;
+        }
+      }
+    }
+  }
+
   // --- Truth blockade -----------------------------------------------------
   // Truth pieces are passive blockers (uncapturable except by the enemy King),
   // so the engine should use them to cramp the opponent: sit in front of the
@@ -623,7 +720,7 @@ let curOpening = null; // { wTarget, bTarget } — opening pawn-targeting contex
 // Tunable eval weights (self-play Texel-style tuning) and the learned
 // win-rate scores for the root position, both populated at the start of each
 // bestMove call so the hot evaluate() path never touches storage.
-let curWeights = { kingSafety: 1, contempt: 1, truthHunt: 1, center: 1, passedPawn: 1 };
+let curWeights = { kingSafety: 1, contempt: 1, truthHunt: 1, center: 1, passedPawn: 1, structure: 1 };
 let curLearnedScores = null; // Map moveKey -> 0..1, or null
 const CHECK_BONUS = 30;
 const TT = new Map();
@@ -641,8 +738,9 @@ function quiesce(state, color, alpha, beta, qsPly = 0) {
   const all = allLegalMoves(state, color);
   if (all.length === 0) return checked ? -MATE : 0;
   let moves;
+  let stand = 0;
   if (!checked) {
-    const stand = evaluate(state.board) * (color === 'w' ? 1 : -1);
+    stand = evaluate(state.board) * (color === 'w' ? 1 : -1);
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
     moves = all.filter((m) => m.captured || m.promotion);
@@ -659,6 +757,10 @@ function quiesce(state, color, alpha, beta, qsPly = 0) {
   }
   for (const m of orderMoves(moves)) {
     if (now() > deadline) { timedOut = true; break; }
+    // Delta pruning: a capture that cannot lift the static score back above
+    // alpha even after winning the piece (plus a safety margin) can never
+    // become the best move — skip it without searching.
+    if (!checked && m.captured && !m.promotion && stand + VALUES[m.captured.type] + 200 <= alpha) continue;
     const ns = makeMove(state, m);
     const sc = -quiesce(ns, opp, -beta, -alpha, qsPly + 1);
     if (sc >= beta) return beta;
@@ -681,7 +783,7 @@ function hasNonPawnMaterial(state, color) {
 
 function negamax(state, color, depth, alpha, beta, ply) {
   if (now() > deadline || ++nodeCount > MAX_NODES) { timedOut = true; return alpha; }
-  const key = hashState(state.board, state.turn);
+  const key = hashState(state);
   const tt = TT.get(key);
   let ttMove = null;
   if (tt) {
