@@ -24,6 +24,7 @@ import {
   tuneEvalWeights,
 } from '@/lib/aiLearning';
 import { generateCode, replayGame, replayStates, serializeMove } from '@/lib/onlineGame';
+import { saveGame, loadSavedGame } from '@/lib/gamePersistence';
 import { randomOpening, bookMove } from '@/lib/openings';
 import { movesToSAN, classifyMove, hasThreefold, toPGN } from '@/lib/chessNotation';
 import { useChessSounds } from '@/hooks/useChessSounds';
@@ -100,25 +101,59 @@ function loneKingLoser(state) {
 }
 
 export default function Home() {
-  const [mode, setMode] = useState('computer'); // 'local' | 'computer' | 'online'
+  // Refresh persistence: replay the saved local game (if any) once on mount so
+  // a page refresh or an accidental back-button restores the game exactly
+  // where it left off instead of restarting it. Online games are skipped —
+  // they already live on the server.
+  const savedGame = useMemo(() => loadSavedGame(), []);
+  const restored = useMemo(() => {
+    if (!savedGame) return null;
+    try {
+      const positions = replayStates(savedGame.moves);
+      if (!positions || positions.length < 2) return null;
+      const last = positions[positions.length - 1];
+      const st = gameStatus(last.state);
+      const wasOver =
+        st === 'checkmate' || st === 'stalemate' || st === 'fifty_move' ||
+        hasThreefold(savedGame.moves) ||
+        !!savedGame.resigned || !!savedGame.drawAgreed ||
+        !!savedGame.timedOut || !!savedGame.cvcResignResult;
+      return {
+        positions,
+        state: last.state,
+        captured: last.captured || { w: [], b: [] },
+        lastMove: last.lastMove || null,
+        wasOver,
+      };
+    } catch {
+      return null;
+    }
+  }, [savedGame]);
+
+  const [mode, setMode] = useState(restored ? savedGame.mode : 'computer'); // 'local' | 'computer' | 'online'
 
   // local / computer
-  const [localState, setLocalState] = useState(initialState);
+  const [localState, setLocalState] = useState(restored ? restored.state : initialState);
   const [selected, setSelected] = useState(null);
   const [legalMoves, setLegalMoves] = useState([]);
-  const [localCaptured, setLocalCaptured] = useState({ w: [], b: [] });
-  const [localLastMove, setLocalLastMove] = useState(null);
+  const [localCaptured, setLocalCaptured] = useState(restored ? restored.captured : { w: [], b: [] });
+  const [localLastMove, setLocalLastMove] = useState(restored ? restored.lastMove : null);
   const [promo, setPromo] = useState(null);
-  const [difficulty, setDifficulty] = useState(1);
+  const [difficulty, setDifficulty] = useState(restored ? savedGame.difficulty ?? 1 : 1);
   const [thinking, setThinking] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(restored ? restored.positions.slice(0, -1) : []);
   const [pendingAdvance, setPendingAdvance] = useState(false);
   // Opening book shared by AI-vs-AI and vs-Computer: a randomly chosen
   // traditional opening for the current game. The index into the book is just
   // localMoves.length, so it stays aligned with actual play.
-  const openingRef = useRef({ book: null, wTarget: null, bTarget: null });
-  const recordedRef = useRef(false);
-  const dailyStatRef = useRef(false);
+  // A restored game skips the scripted opening book (its ply history no longer
+  // matches a fresh opening): an empty book is truthy so the AI effect never
+  // rolls a new one, and bookMove() finds nothing at every ply.
+  const openingRef = useRef(restored ? { book: { moves: [] }, wTarget: null, bTarget: null } : { book: null, wTarget: null, bTarget: null });
+  // A restored game that was already over had its result recorded before the
+  // refresh — start these refs flagged so the outcome is never counted twice.
+  const recordedRef = useRef(!!restored?.wasOver);
+  const dailyStatRef = useRef(!!restored?.wasOver);
   const kingOnlySinceRef = useRef(null);
   const computerGameRef = useRef(null);
   const computerBroadcastRef = useRef({ queue: [], gameOver: false, status: 'playing', turn: 'w', processing: false });
@@ -132,7 +167,7 @@ export default function Home() {
   const [autoFlip, setAutoFlip] = useState(false);
   const [hint, setHint] = useState(null);
   const [hintLoading, setHintLoading] = useState(false);
-  const [resigned, setResigned] = useState(false);
+  const [resigned, setResigned] = useState(!!restored && !!savedGame.resigned);
   const [soundOn, setSoundOn] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [startMs, setStartMs] = useState(Date.now());
@@ -141,24 +176,32 @@ export default function Home() {
   const { toast } = useToast();
 
   // batch-2 additions
-  const [localMoves, setLocalMoves] = useState([]);
-  const [drawAgreed, setDrawAgreed] = useState(false);
+  const [localMoves, setLocalMoves] = useState(restored ? savedGame.moves : []);
+  const [drawAgreed, setDrawAgreed] = useState(!!restored && !!savedGame.drawAgreed);
   const [reviewIdx, setReviewIdx] = useState(null);
-  const [timeControl, setTimeControl] = useState('30+0');
-  const [whiteClock, setWhiteClock] = useState(TIME_CONTROLS['30+0'].initial);
-  const [blackClock, setBlackClock] = useState(TIME_CONTROLS['30+0'].initial);
-  const [timedOut, setTimedOut] = useState(null);
+  const [timeControl, setTimeControl] = useState(
+    restored && savedGame.timeControl && TIME_CONTROLS[savedGame.timeControl]
+      ? savedGame.timeControl
+      : '30+0'
+  );
+  const [whiteClock, setWhiteClock] = useState(
+    restored && Number.isFinite(savedGame.whiteClock) ? savedGame.whiteClock : TIME_CONTROLS['30+0'].initial
+  );
+  const [blackClock, setBlackClock] = useState(
+    restored && Number.isFinite(savedGame.blackClock) ? savedGame.blackClock : TIME_CONTROLS['30+0'].initial
+  );
+  const [timedOut, setTimedOut] = useState(restored ? savedGame.timedOut ?? null : null);
   const [animateMove, setAnimateMove] = useState(null);
   const [showPro, setShowPro] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(!!restored);
   const [sendingEmail, setSendingEmail] = useState(false);
   // AI vs AI agreed resignation: a lone-king side offers to resign and the
   // opponent accepts, shown to the spectator so they don't sit through a dead
   // 50-move grind. `autoResign` drives the visible offer→accept flow;
   // `cvcResignResult` ends the game.
   const [autoResign, setAutoResign] = useState(null);
-  const [cvcResignResult, setCvcResignResult] = useState(null);
+  const [cvcResignResult, setCvcResignResult] = useState(restored ? savedGame.cvcResignResult ?? null : null);
   // Resetting an in-progress game shows a confirmation popup because it
   // counts as a resignation (the game is recorded as a loss before resetting).
   const [resetConfirm, setResetConfirm] = useState(false);
@@ -172,7 +215,7 @@ export default function Home() {
   const prevSoundRef = useRef(true);
   // vs Computer: the human's color for the current game. Default White; a
   // player who wins as Black earns White for the next game (traditional chess).
-  const [playerColor, setPlayerColor] = useState('w');
+  const [playerColor, setPlayerColor] = useState(restored && savedGame.playerColor === 'b' ? 'b' : 'w');
   const wonAsBlackRef = useRef(false);
   const computerColor = playerColor === 'w' ? 'b' : 'w';
   // Pondering engine worker (vs Computer): while the human is deciding, the
@@ -1576,6 +1619,40 @@ export default function Home() {
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     base44.functions.invoke('record-game-played', { date }).catch(() => {});
   }, [gameOver, mode, onlineGame?.status, spectator, myColor]);
+
+  // --- refresh persistence -------------------------------------------------
+  // Local games (2 Players, vs Computer, AI vs AI) are saved to the browser as
+  // they're played and restored on load, so a page refresh or an accidental
+  // back-button resumes the game instead of restarting it. Critical changes
+  // (a move, settings) save immediately; clock-only changes are throttled to
+  // roughly one save per second. Online games are skipped — they already live
+  // on the server.
+  const saveFlushRef = useRef(true);
+  const lastSaveAtRef = useRef(0);
+  useEffect(() => {
+    saveFlushRef.current = true;
+  }, [localMoves, started, mode, timeControl, playerColor, difficulty, resigned, drawAgreed, timedOut, cvcResignResult]);
+  useEffect(() => {
+    if (mode === 'online') return;
+    const now = Date.now();
+    if (!saveFlushRef.current && now - lastSaveAtRef.current < 900) return;
+    saveFlushRef.current = false;
+    lastSaveAtRef.current = now;
+    saveGame({
+      mode,
+      moves: localMoves,
+      playerColor,
+      difficulty,
+      timeControl,
+      whiteClock,
+      blackClock,
+      started,
+      resigned,
+      drawAgreed,
+      timedOut,
+      cvcResignResult,
+    });
+  }, [mode, localMoves, playerColor, difficulty, timeControl, whiteClock, blackClock, started, resigned, drawAgreed, timedOut, cvcResignResult]);
 
   function advance() {
     setDifficulty((d) => Math.min(10, d + 1));
