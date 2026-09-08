@@ -11,6 +11,7 @@ import {
   getPersistentBestMove,
   setPersistentBestMove,
   loadEvalWeights,
+  DEFAULT_EVAL_WEIGHTS,
 } from './aiLearning';
 
 const VALUES = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000, T: 350 };
@@ -878,9 +879,14 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   const cfg = DIFFICULTIES[difficulty] || DIFFICULTIES[4];
   useQuiescence = cfg.quiescence;
   aggressive = aggressiveMode;
-  curAggressionMul = loadAggression().aggressionMul || 1;
-  curWeights = loadEvalWeights();
-  curLearnedScores = getLearnedMoveScores(state);
+  // Baseline mode (ctx.baseline): a plain search with NO learned knowledge —
+  // default eval weights, no mate book, no learned move scores, no persisted
+  // move hints. Used by the strength-validation tournament to measure exactly
+  // what the learned systems (mate book + position memory + tuning) add.
+  const baseline = !!(ctx && ctx.baseline);
+  curAggressionMul = baseline ? 1 : loadAggression().aggressionMul || 1;
+  curWeights = baseline ? { ...DEFAULT_EVAL_WEIGHTS } : loadEvalWeights();
+  curLearnedScores = baseline ? null : getLearnedMoveScores(state);
   curOpening =
     ctx && ctx.ply != null && ctx.ply < OPENING_PLIES && (ctx.wTarget || ctx.bTarget)
       ? { wTarget: ctx.wTarget || null, bTarget: ctx.bTarget || null }
@@ -913,7 +919,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   // play instantly; deeper remembered mates are used as a strong move-ordering
   // hint (the search re-verifies them), so the engine gravitates toward lines
   // it has solved — now also covering the symmetric wing of the board.
-  const bookHit = consultMateBookMirrored(state);
+  const bookHit = baseline ? null : consultMateBookMirrored(state);
   if (bookHit && bookHit.mateIn === 1) {
     setPersistentBestMove(state, bookHit.move);
     return bookHit.move; // a forced mate is never a draw
@@ -929,7 +935,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       return inCheck(ns, opp0) && allLegalMoves(ns, opp0).length === 0;
     });
     if (!mateInOne) {
-      setPersistentBestMove(state, freeTruthCapture);
+      if (!baseline) setPersistentBestMove(state, freeTruthCapture);
       return freeTruthCapture;
     }
   }
@@ -956,7 +962,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
       .sort((a, b) => b.s - a.s)
       .map((x) => x.m);
   }
-  const persistHint = getPersistentBestMove(state);
+  const persistHint = baseline ? null : getPersistentBestMove(state);
   if (persistHint) {
     const hi = ordered.find(
       (m) => m.from[0] === persistHint.from[0] && m.from[1] === persistHint.from[1] && m.to[0] === persistHint.to[0] && m.to[1] === persistHint.to[1]
@@ -995,7 +1001,8 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   }
   const chosen = pickNonDrawing(state, best || ordered[0], ordered, pkeys);
   // Persist the chosen move so the next game reaches it faster (cross-game
-  // move memory). Skipped for one-off mate-in-1 hits (already persisted above).
-  setPersistentBestMove(state, chosen);
+  // move memory). Skipped for one-off mate-in-1 hits and for baseline-mode
+  // (tournament control) engines, which must stay knowledge-free.
+  if (!baseline) setPersistentBestMove(state, chosen);
   return chosen;
 }

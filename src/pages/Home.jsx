@@ -47,6 +47,7 @@ import { usePresence } from '@/hooks/usePresence';
 import { Users, Computer, Globe, Bot, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 import EngineTraining from '@/components/EngineTraining';
+import TournamentPanel from '@/components/TournamentPanel';
 
 const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
@@ -1898,6 +1899,7 @@ export default function Home() {
                 onSelectDepth={setTrainingDepth}
               />
             )}
+            {me?.role === 'admin' && <TournamentPanel />}
             {mode === 'online' && (
               <OnlinePanel
                 onlineGame={onlineGame}
