@@ -13,6 +13,7 @@ import {
 } from '@/lib/chessVariant';
 
 import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
+import { createEngineClient } from '@/lib/engineClient';
 import {
   rollOpeningTarget,
   recordMate,
@@ -174,6 +175,13 @@ export default function Home() {
   const [playerColor, setPlayerColor] = useState('w');
   const wonAsBlackRef = useRef(false);
   const computerColor = playerColor === 'w' ? 'b' : 'w';
+  // Pondering engine worker (vs Computer): while the human is deciding, the
+  // engine keeps searching in a background worker — wave after wave, each one
+  // deeper — so the waiting time becomes thinking time and the reply after the
+  // human's move starts from a warmed-up, deeper search.
+  const engineClientRef = useRef(null);
+  const engineSearchSeq = useRef(0);
+  const ponderTimerRef = useRef(null);
 
   // online
   const [me, setMe] = useState(null);
@@ -196,6 +204,16 @@ export default function Home() {
 
   useEffect(() => {
     document.title = 'Truth Chess';
+  }, []);
+
+  // Create the pondering engine worker once. If workers are unavailable, the
+  // vs-Computer AI falls back to the original in-page search automatically.
+  useEffect(() => {
+    engineClientRef.current = createEngineClient();
+    return () => {
+      if (engineClientRef.current) engineClientRef.current.dispose();
+      engineClientRef.current = null;
+    };
   }, []);
 
   // Stable identity for online play: registered users use their account;
@@ -1248,7 +1266,8 @@ export default function Home() {
 
   // computer AI: opens with a randomly chosen traditional opening (one of
   // twenty-three) for as long as the human's moves keep the book on track, then
-  // plays the search engine. Never allows threefold repetition.
+  // plays the search engine — in the pondering worker when available (falling
+  // back to the in-page search otherwise). Never allows threefold repetition.
   useEffect(() => {
     if (mode !== 'computer' || turn !== computerColor || gameOver || promo || !started) return;
     if (!openingRef.current.book) {
@@ -1258,6 +1277,7 @@ export default function Home() {
         bTarget: computerColor === 'b' ? rollOpeningTarget('b', localState.board) : null,
       };
     }
+    const token = ++engineSearchSeq.current;
     setThinking(true);
     const t = setTimeout(() => {
       const legal = allLegalMoves(localState, computerColor);
@@ -1265,22 +1285,39 @@ export default function Home() {
       const scripted = sideTarget
         ? null
         : bookMove(openingRef.current.book, localMoves.length, legal, computerColor);
-      let move;
-      if (scripted) move = scripted;
-      else {
-        const ctx = {
-          ply: localMoves.length,
-          wTarget: openingRef.current.wTarget ? openingRef.current.wTarget.type : null,
-          bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
-          positionKeys: positionList.map((p) => positionKey(p.state)),
-        };
-        move = bestMove(localState, computerColor, difficulty, false, ctx);
+      const finish = (m) => {
+        let move = m;
+        // Always avoid threefold repetition (unless no other legal move avoids
+        // it), even for opening-book moves.
+        if (move) move = pickNonRepeating(localState, move, localMoves);
+        if (move) commitMove(move, 'Q');
+        setThinking(false);
+      };
+      if (scripted) {
+        finish(scripted);
+        return;
       }
-      // Always avoid threefold repetition (unless no other legal move avoids
-      // it), even for opening-book moves.
-      if (move) move = pickNonRepeating(localState, move, localMoves);
-      if (move) commitMove(move, 'Q');
-      setThinking(false);
+      const ctx = {
+        ply: localMoves.length,
+        wTarget: openingRef.current.wTarget ? openingRef.current.wTarget.type : null,
+        bTarget: openingRef.current.bTarget ? openingRef.current.bTarget.type : null,
+        positionKeys: positionList.map((p) => positionKey(p.state)),
+      };
+      const client = engineClientRef.current;
+      if (client) {
+        client
+          .search(localState, computerColor, difficulty, ctx, (DIFFICULTIES[difficulty] || DIFFICULTIES[4]).timeMs + 8000)
+          .then((m) => {
+            if (engineSearchSeq.current !== token) return; // stale reply — reset/new search superseded it
+            finish(m);
+          })
+          .catch(() => {
+            if (engineSearchSeq.current !== token) return;
+            finish(bestMove(localState, computerColor, difficulty, false, ctx)); // worker fallback
+          });
+      } else {
+        finish(bestMove(localState, computerColor, difficulty, false, ctx));
+      }
     }, 350);
     return () => {
       clearTimeout(t);
@@ -1288,6 +1325,34 @@ export default function Home() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, gameOver, promo, localState, difficulty, turn, localMoves, started, computerColor]);
+
+  // Pondering (vs Computer only): while the human is deciding their move, the
+  // engine keeps searching in the background worker — one short wave after
+  // another, each deeper than the last — so by the time the player finally
+  // moves, the engine has already spent the waiting time on deep analysis and
+  // its reply search starts from the warmed-up search memory.
+  useEffect(() => {
+    if (mode !== 'computer' || !started || gameOver) return;
+    if (turn !== playerColor) return; // ponder only during the human's turn
+    const client = engineClientRef.current;
+    if (!client) return;
+    let cancelled = false;
+    let wave = 0;
+    const tick = () => {
+      if (cancelled) return;
+      client.ponder(localState, computerColor, difficulty, wave++);
+      ponderTimerRef.current = setTimeout(tick, 1700);
+    };
+    ponderTimerRef.current = setTimeout(tick, 800);
+    return () => {
+      cancelled = true;
+      if (ponderTimerRef.current) {
+        clearTimeout(ponderTimerRef.current);
+        ponderTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, started, gameOver, turn, localState, difficulty, computerColor, playerColor]);
 
   // computer vs computer: each side opens with a randomly chosen traditional
   // opening (one of twenty-three), then auto-plays at level 6 — aggressively

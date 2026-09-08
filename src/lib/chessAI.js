@@ -891,10 +891,16 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
     ctx && ctx.ply != null && ctx.ply < OPENING_PLIES && (ctx.wTarget || ctx.bTarget)
       ? { wTarget: ctx.wTarget || null, bTarget: ctx.bTarget || null }
       : null;
-  deadline = now() + cfg.timeMs;
+  // Ponder-wave callers (the vs-Computer background worker) pass their own
+  // short per-wave budget; normal play uses the difficulty's time budget.
+  deadline = now() + (ctx && ctx.timeMs ? ctx.timeMs : cfg.timeMs);
   timedOut = false;
   nodeCount = 0;
-  TT.clear();
+  // Ponder waves (and the real reply search after them) share the transposition
+  // table, so background thinking during the human's turn makes the eventual
+  // reply search start warm — already deep. An oversized table is cleared to
+  // bound memory.
+  if (!ctx || !ctx.keepTT || TT.size > 150000) TT.clear();
   killers = Array.from({ length: MAX_PLY + 8 }, () => [null, null]);
   historyTab = new Int32Array(FILES * RANKS * FILES * RANKS);
 
@@ -972,7 +978,7 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   if (bookHit) ordered = [bookHit.move, ...ordered.filter((m) => m !== bookHit.move)];
   let best = ordered[0];
   let bestScore = -Infinity;
-  for (let d = 1; d <= cfg.depth; d++) {
+  for (let d = 1; d <= cfg.depth + ((ctx && ctx.depthBonus) || 0); d++) {
     let alpha = -Infinity;
     let curBest = null;
     let curBestScore = -Infinity;

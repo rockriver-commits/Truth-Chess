@@ -8,7 +8,17 @@
 //   3. Opening targeting — during the opening, with a per-game chance, the AI
 //      picks a random enemy piece and pushes its pawns to attack it.
 import { positionKey, legalMovesFor, RANKS, FILES } from './chessVariant';
-import { base44 } from '@/api/base44Client';
+
+// The SDK client is imported lazily so this module can also load inside the
+// pondering engine Web Worker, where the full client isn't available.
+let _sdk = null;
+async function getSdk() {
+  if (!_sdk) {
+    const mod = await import('@/api/base44Client');
+    _sdk = mod.base44;
+  }
+  return _sdk;
+}
 
 const MATE_BOOK_KEY = 'tc-mate-book';
 const AGGRO_KEY = 'tc-ai-aggression';
@@ -56,6 +66,7 @@ export async function syncMateBookFromServer() {
   if (_synced) return _bookCache;
   _synced = true;
   try {
+    const base44 = await getSdk();
     const rows = await base44.entities.MateBook.list('-updated_date', 5000);
     const b = getBook();
     for (const row of rows || []) {
@@ -122,6 +133,7 @@ export async function recordMate(positionList) {
   if (changed) saveLocal(b);
   // Best-effort server upsert; failures leave the local cache consistent.
   try {
+    const base44 = await getSdk();
     if (toCreate.length) {
       const created = await base44.entities.MateBook.bulkCreate(toCreate);
       const arr = Array.isArray(created) ? created : created?.data || created?.items || [];
@@ -143,6 +155,7 @@ export async function recordMate(positionList) {
 // Adaptive aggression
 // ---------------------------------------------------------------------------
 export function loadAggression() {
+  if (_overrideAggression) return _overrideAggression;
   try {
     const v = JSON.parse(localStorage.getItem(AGGRO_KEY));
     if (v && typeof v.aggressionMul === 'number') return v;
@@ -241,6 +254,7 @@ export async function syncLearnedPositionsFromServer() {
   if (_learnedSynced) return _learnedCache;
   _learnedSynced = true;
   try {
+    const base44 = await getSdk();
     const rows = await base44.entities.LearnedPosition.list('-updated_date', 5000);
     const c = getLearned();
     for (const row of rows || []) {
@@ -328,6 +342,7 @@ export async function recordGameResult(positionList, result) {
   }
   if (changed) saveLearnedLocal(c);
   try {
+    const base44 = await getSdk();
     if (toCreate.length) {
       const created = await base44.entities.LearnedPosition.bulkCreate(toCreate);
       const arr = Array.isArray(created) ? created : created?.data || created?.items || [];
@@ -361,6 +376,7 @@ const EVAL_MAX = 2.0;
 const EVAL_STEP = 0.02;
 
 export function loadEvalWeights() {
+  if (_overrideWeights) return { ...DEFAULT_EVAL_WEIGHTS, ..._overrideWeights };
   try {
     const v = JSON.parse(localStorage.getItem(EVAL_KEY));
     if (v && typeof v === 'object') return { ...DEFAULT_EVAL_WEIGHTS, ...v };
@@ -523,11 +539,45 @@ export async function deepenMateBook(solver, maxDepth = 8, maxPositions = 3) {
         b[k] = { from: improved.from, to: improved.to, mateIn: improved.mateIn, id: e?.id };
         saveLocal(b);
         if (e?.id) {
-          try { await base44.entities.MateBook.update(e.id, { from: improved.from, to: improved.to, mateIn: improved.mateIn }); } catch { /* ignore */ }
+          try {
+            const base44 = await getSdk();
+            await base44.entities.MateBook.update(e.id, { from: improved.from, to: improved.to, mateIn: improved.mateIn });
+          } catch { /* ignore */ }
         }
       }
     } catch {
       // solver may time out or the position may be unreachable — skip
     }
   }
+}
+
+// ===========================================================================
+// 6. Worker-mode support (pondering engine)
+// ===========================================================================
+// The pondering Web Worker has no localStorage and no server access. The
+// main thread snapshots the learned knowledge and posts it in once, and these
+// hooks make it available to the worker's search.
+
+export function getMateBookSnapshot() {
+  return getBook();
+}
+
+export function getLearnedSnapshot() {
+  return getLearned();
+}
+
+let _overrideWeights = null;
+let _overrideAggression = null;
+
+export function setEngineOverrides(o = {}) {
+  if (o.book && typeof o.book === 'object') {
+    _bookCache = o.book;
+    _synced = true;
+  }
+  if (o.learned && typeof o.learned === 'object') {
+    _learnedCache = o.learned;
+    _learnedSynced = true;
+  }
+  if (o.weights && typeof o.weights === 'object') _overrideWeights = o.weights;
+  if (o.aggression && typeof o.aggression === 'object') _overrideAggression = o.aggression;
 }
