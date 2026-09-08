@@ -86,20 +86,20 @@ module.exports = {
   				}
   			},
   			'status-flash': {
-  				'0%, 100%': {
-  					transform: 'scale(1)',
-  					color: '#475569'
-  				},
-  				'50%': {
-  					transform: 'scale(1.35)',
-  					color: '#dc2626'
+  					'0%, 100%': {
+  						transform: 'scale(1)',
+  						color: '#475569'
+  					},
+  					'50%': {
+  						transform: 'scale(1.08)',
+  						color: '#64748b'
+  					}
   				}
-  			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
-  			'status-flash': 'status-flash 1.8s ease-in-out infinite'
+  			'status-flash': 'status-flash 3.5s ease-in-out infinite'
   		}
   	}
   },
