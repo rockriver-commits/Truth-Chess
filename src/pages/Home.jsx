@@ -612,6 +612,7 @@ export default function Home() {
 
   function startTraining() {
     prevSoundRef.current = soundOn;
+    trainingGamesRef.current = 0;
     setTrainingGames(0);
     setTrainingActive(true);
     setSoundOn(false);
@@ -1380,27 +1381,40 @@ export default function Home() {
 
   // Engine Training auto-restart: when a self-play game ends, count it and
   // start a fresh one back-to-back until the chosen game-count target is met,
-  // then stop. A ref guard ensures each game-over is counted exactly once
-  // (trainingGames is in the deps but gameOver stays true until resetLocal).
+  // then stop. A ref guard ensures each game-over is counted exactly once.
+  // The 1.2s between-games timer lives in a ref, NOT as effect cleanup: the
+  // counter update used to re-run this effect (trainingGames was a dep), and
+  // the cleanup cancelled the pending restart before it fired — which
+  // stranded training after game 1. gameOver stays true until the timer
+  // itself resets the board, so nothing clears the timer mid-wait.
   const trainingCountedRef = useRef(false);
+  const trainingGamesRef = useRef(0);
+  const trainingTimerRef = useRef(null);
   useEffect(() => {
     if (mode !== 'cvc_turbo' || !trainingActive) return;
     if (!gameOver) { trainingCountedRef.current = false; return; }
     if (trainingCountedRef.current) return;
     trainingCountedRef.current = true;
-    const newCount = trainingGames + 1;
-    setTrainingGames(newCount);
-    if (newCount >= trainingTarget) {
-      const t = setTimeout(() => stopTraining(), 1200);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => {
-      resetLocal();
-      setStarted(true);
+    if (trainingTimerRef.current) clearTimeout(trainingTimerRef.current);
+    trainingTimerRef.current = setTimeout(() => {
+      trainingTimerRef.current = null;
+      trainingGamesRef.current += 1;
+      const newCount = trainingGamesRef.current;
+      setTrainingGames(newCount);
+      if (newCount >= trainingTarget) stopTraining();
+      else {
+        resetLocal();
+        setStarted(true);
+      }
     }, 1200);
-    return () => clearTimeout(t);
+    return () => {
+      if (trainingTimerRef.current) {
+        clearTimeout(trainingTimerRef.current);
+        trainingTimerRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, trainingActive, gameOver, trainingGames, trainingTarget]);
+  }, [mode, trainingActive, gameOver, trainingTarget]);
 
   // ghost opponent: AI plays the other side over the online channel (test mode)
   useEffect(() => {
