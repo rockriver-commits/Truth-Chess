@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import ChessBoard from '@/components/ChessBoard';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   initialState,
   legalMovesFor,
@@ -12,7 +12,7 @@ import {
   positionKey,
 } from '@/lib/chessVariant';
 
-import { bestMove, DIFFICULTIES } from '@/lib/chessAI';
+import { bestMove, DIFFICULTIES, materialBalance } from '@/lib/chessAI';
 import { createEngineClient } from '@/lib/engineClient';
 import {
   rollOpeningTarget,
@@ -44,16 +44,18 @@ import CheckmateEstimate from '@/components/CheckmateEstimate';
 import ShareMoves from '@/components/ShareMoves';
 import GameOverBanner from '@/components/GameOverBanner';
 import ImportGameDialog from '@/components/ImportGameDialog';
+import TakeBackRefusal from '@/components/TakeBackRefusal';
+import TruthPieceIcon, { TruthMarkInline } from '@/components/TruthPieceIcon';
+import PromotionDialog from '@/components/PromotionDialog';
+import HowToPlay from '@/components/HowToPlay';
 import ResignFlowBanner from '@/components/ResignFlowBanner';
 import LobbyPanel from '@/components/LobbyPanel';
 import PlayerNameCard from '@/components/PlayerNameCard';
 import { usePresence } from '@/hooks/usePresence';
-import { Users, Computer, Globe, Bot, RotateCcw, Download, Volume2, VolumeX } from 'lucide-react';
+import { Users, Computer, Globe, Bot, RotateCcw, Download, Volume2, VolumeX, Undo2 } from 'lucide-react';
 import CapturedSide from '@/components/CapturedSide';
 import EngineTraining from '@/components/EngineTraining';
 import TournamentPanel from '@/components/TournamentPanel';
-
-const GLYPHS = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟', T: '♚' };
 
 // Game modes. Pro-only modes are gated behind the upgrade prompt on web and
 // hidden on mobile (where Pro can't be purchased). vs Computer and AI vs AI
@@ -209,6 +211,10 @@ export default function Home() {
   const [resetConfirm, setResetConfirm] = useState(false);
   // Paste-a-game import dialog: recreate a game from notation on the board.
   const [showImport, setShowImport] = useState(false);
+  // Take-back: Zveritas' refusal message in vs Computer mode — dismissed by a
+  // board click or 10 seconds after it appears, whichever comes first.
+  const [takeBackRefusal, setTakeBackRefusal] = useState(false);
+  const takeBackTimerRef = useRef(null);
   // Deep training mode: counts consecutive self-play games played this session.
   const [trainingGames, setTrainingGames] = useState(0);
   // Engine Training card: chosen game count + search depth, plus an active flag
@@ -287,6 +293,20 @@ export default function Home() {
     }
     guestTagRef.current = tag;
   }
+  // Mini-board links open a game with ?watch=CODE — spectate it in this tab
+  // once the live-games list loads it. Keyed on the route search so a
+  // same-page navigation to a watch link works too.
+  const watchParamRef = useRef(null);
+  const location = useLocation();
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(location.search).get('watch');
+      if (p) watchParamRef.current = p.toUpperCase();
+    } catch { /* ignore */ }
+  }, [location.search]);
+  const prevOnlineStatusRef = useRef(null);
+  const identityRef = useRef(null);
+
   const identity = useMemo(() => {
     if (me) {
       const name = me.player_name || me.data?.player_name || '';
@@ -426,6 +446,14 @@ export default function Home() {
   }, [mode, onlineGame, drawAgreed, resigned, turn, status, threefold]);
 
   function handleSquareClick(r, f) {
+    // Any board click dismisses the take-back refusal message.
+    if (takeBackRefusal) {
+      setTakeBackRefusal(false);
+      if (takeBackTimerRef.current) {
+        clearTimeout(takeBackTimerRef.current);
+        takeBackTimerRef.current = null;
+      }
+    }
     if (reviewing || gameOver || promo || submitting) return;
     if (mode === 'cvc' || mode === 'cvc_turbo') return;
     if (mode === 'computer' && turn === computerColor) return;
@@ -577,6 +605,28 @@ export default function Home() {
     if ((mode !== 'local' && mode !== 'computer') || gameOver) return;
     setDrawAgreed(true);
     playSound('mate');
+  }
+
+  // Take back the last move(s): vs Computer, Zveritas always accepts unless
+  // its analysis says it stands clearly worse — then it refuses with a smiley
+  // and the request is dropped. Online, it sends the opponent a take-back
+  // offer they can accept (the last move is undone) or decline.
+  function requestTakeBack() {
+    if (mode === 'online') {
+      proposeTakeBackOnline();
+      return;
+    }
+    if (mode !== 'computer' || gameOver || thinking || promo) return;
+    if (materialBalance(localState, computerColor) < -150) {
+      if (takeBackTimerRef.current) clearTimeout(takeBackTimerRef.current);
+      setTakeBackRefusal(true);
+      takeBackTimerRef.current = setTimeout(() => {
+        takeBackTimerRef.current = null;
+        setTakeBackRefusal(false);
+      }, 10000);
+      return;
+    }
+    undo();
   }
 
   // Resetting an in-progress game counts as a resignation: confirm with a
@@ -802,6 +852,10 @@ export default function Home() {
       });
       prevMovesLen.current = 0;
       setOnlineGame(rec);
+      toast({
+        title: 'Online game started',
+        description: `Waiting for an opponent to join — code ${code}`,
+      });
     } catch (e) {
       setOnlineError('Could not create game.');
     }
@@ -846,7 +900,7 @@ export default function Home() {
       const newMoves = [...(onlineGame.moves || []), stored];
       const { state: ns } = replayGame(newMoves);
       const st = gameStatus(ns);
-      const patch = { moves: newMoves, last_move_at: new Date().toISOString(), draw_offer_by: null };
+      const patch = { moves: newMoves, last_move_at: new Date().toISOString(), draw_offer_by: null, take_back_offer_by: null };
       if (st === 'checkmate') {
         patch.status = 'finished';
         patch.result = ns.turn === 'w' ? 'black_wins' : 'white_wins';
@@ -947,6 +1001,45 @@ export default function Home() {
       setOnlineGame(updated);
     } catch {
       setOnlineError('Could not decline draw.');
+    }
+  }
+
+  async function proposeTakeBackOnline() {
+    if (!onlineGame || onlineGame.status !== 'active' || !myColor) return;
+    if (!(onlineGame.moves || []).length) return;
+    try {
+      const updated = await base44.entities.Game.update(onlineGame.id, { take_back_offer_by: myColor });
+      setOnlineGame(updated);
+      toast({ title: 'Take back proposed', description: 'Waiting for your opponent to accept…' });
+    } catch {
+      setOnlineError('Could not propose take back.');
+    }
+  }
+
+  async function acceptTakeBackOnline() {
+    if (!onlineGame || onlineGame.status !== 'active') return;
+    try {
+      const moves = (onlineGame.moves || []).slice(0, -1);
+      const updated = await base44.entities.Game.update(onlineGame.id, {
+        moves,
+        take_back_offer_by: null,
+        last_move_at: new Date().toISOString(),
+      });
+      prevMovesLen.current = moves.length;
+      setOnlineGame(updated);
+      playSound('move');
+    } catch {
+      setOnlineError('Could not accept take back.');
+    }
+  }
+
+  async function declineTakeBackOnline() {
+    if (!onlineGame) return;
+    try {
+      const updated = await base44.entities.Game.update(onlineGame.id, { take_back_offer_by: null });
+      setOnlineGame(updated);
+    } catch {
+      setOnlineError('Could not decline take back.');
     }
   }
 
@@ -1054,8 +1147,10 @@ export default function Home() {
       // their browser — delete the stale record so it stops showing in the
       // lobby. Avoid deleting the game this client is currently waiting in.
       const cutoff = Date.now() - 10 * 60 * 1000;
+      const myId = identityRef.current?.id;
       const stale = (waiting || []).filter((g) => {
         if (onlineGame && g.id === onlineGame.id) return false;
+        if (myId && (g.white_player_id === myId || g.black_player_id === myId)) return false;
         const ts = g.last_move_at ? Date.parse(g.last_move_at) : Date.parse(g.created_date);
         return !isNaN(ts) && ts < cutoff;
       });
@@ -1073,6 +1168,7 @@ export default function Home() {
       const activeCutoff = Date.now() - 30 * 60 * 1000;
       const staleActive = (active || []).filter((g) => {
         if (onlineGame && g.id === onlineGame.id) return false;
+        if (myId && (g.white_player_id === myId || g.black_player_id === myId)) return false;
         if (computerGameRef.current && g.id === computerGameRef.current.id) return false;
         const ts = g.last_move_at ? Date.parse(g.last_move_at) : Date.parse(g.created_date);
         return !isNaN(ts) && ts < activeCutoff;
@@ -1254,6 +1350,8 @@ export default function Home() {
             // ignore animation failure
           }
           prevMovesLen.current = newLen;
+        } else if (newLen < prevMovesLen.current) {
+          prevMovesLen.current = newLen; // a take back shrank the game
         }
         setOnlineGame(event.data);
       }
@@ -1300,23 +1398,69 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
-  // Delete the vs-Computer broadcast record and forfeit any active online
-  // game when the page unmounts (route navigation) so neither lingers as an
-  // "active" game no one is playing.
+  // Delete the vs-Computer broadcast record when the page unmounts (route
+  // navigation). An active online game is deliberately NOT forfeited here:
+  // clicking away (Comment, Learn, browser back inside the app) keeps it
+  // alive on the server, and the rejoin effect below returns the player to it
+  // when they come back. Only closing the tab outright (beforeunload above)
+  // or explicitly leaving/resigning ends the game.
   useEffect(() => {
     return () => {
       const g = computerGameRef.current;
       if (g) {
         base44.entities.Game.delete(g.id).catch(() => {});
       }
-      const og = onlineGameRef.current;
-      const mc = myColorRef.current;
-      if (og && og.status === 'active' && mc) {
-        const winner = mc === 'w' ? 'black_wins' : 'white_wins';
-        base44.entities.Game.update(og.id, { status: 'finished', result: winner }).catch(() => {});
-      }
     };
   }, []);
+
+  useEffect(() => { identityRef.current = identity; }, [identity]);
+
+  // Returning to an interrupted online game: coming back to the game page
+  // automatically rejoins any active online game this player is part of, so
+  // play continues where it left off instead of the game silently dying.
+  useEffect(() => {
+    if (watchParamRef.current) return; // a mini-board link is spectating another game
+    if (onlineGame || spectator || !identity?.id || !activeGames.length) return;
+    const mine = activeGames.find(
+      (g) =>
+        g.status === 'active' &&
+        (g.white_player_id === identity.id || g.black_player_id === identity.id) &&
+        g.white_player_id !== '__computer__' && g.black_player_id !== '__computer__' &&
+        g.white_player_id !== '__ghost__' && g.black_player_id !== '__ghost__'
+    );
+    if (!mine) return;
+    setMode('online');
+    reenterOwn(mine);
+    toast({ title: 'Back in your game', description: 'Your online game is still live — play on.' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGames, identity?.id, onlineGame, spectator]);
+
+  // ?watch=CODE (mini-board links): spectate that game in this tab once the
+  // live-games list has loaded it.
+  useEffect(() => {
+    const code = watchParamRef.current;
+    if (!code || spectator || !activeGames.length) return;
+    const g = activeGames.find((x) => x.code === code);
+    if (!g) return;
+    watchParamRef.current = null;
+    watchGame(g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGames, spectator, location.search]);
+
+  // Waiting cue: when the opponent joins the game we created, say so — the
+  // on-board "waiting for an opponent" banner disappears with the join.
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGame) {
+      prevOnlineStatusRef.current = null;
+      return;
+    }
+    const prev = prevOnlineStatusRef.current;
+    prevOnlineStatusRef.current = onlineGame.status;
+    if (prev === 'waiting' && onlineGame.status === 'active') {
+      toast({ title: 'Opponent joined!', description: 'Your online game has started.' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, onlineGame]);
 
   useEffect(() => {
     if (mode === 'online' && onlineGame?.status === 'active') {
@@ -1796,6 +1940,13 @@ export default function Home() {
         pieceStyle="figurine"
       />
       {banner && <GameOverBanner title={banner.title} subtitle={banner.subtitle} />}
+      {takeBackRefusal && <TakeBackRefusal />}
+      {mode === 'online' && onlineGame?.status === 'waiting' && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 rounded-full bg-stone-900/85 text-white text-[0.7rem] font-medium px-3 py-1.5 shadow-lg backdrop-blur pointer-events-none text-center whitespace-nowrap">
+          Online game started — waiting for an opponent
+          <span className="hidden sm:inline"> (code {onlineGame.code})</span>
+        </div>
+      )}
       {autoResign && <ResignFlowBanner loser={autoResign.loser} phase={autoResign.phase} />}
       {!started && mode !== 'online' && (
         <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-stone-900/25 backdrop-blur-[1px]">
@@ -1826,39 +1977,7 @@ export default function Home() {
             <h1 className="flex flex-col items-center justify-center gap-1 text-4xl sm:text-5xl font-display font-semibold tracking-tight text-stone-800 text-center">
               <span className="inline-flex items-center justify-center gap-2">
                 Truth Chess
-                <svg
-                viewBox="0 0 24 24"
-                className="h-[0.85em] w-[0.85em] shrink-0"
-                role="img"
-                aria-label="Truth piece"
-              >
-                <defs>
-                  <linearGradient id="tcVert" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stopColor="#64748b" />
-                    <stop offset="0.5" stopColor="#0f172a" />
-                    <stop offset="1" stopColor="#020617" />
-                  </linearGradient>
-                  <linearGradient id="tcBar" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stopColor="#0b1220" />
-                    <stop offset="0.5" stopColor="#475569" />
-                    <stop offset="1" stopColor="#0b1220" />
-                  </linearGradient>
-                  <radialGradient id="tcJewel" cx="0.35" cy="0.35" r="0.75">
-                    <stop offset="0" stopColor="#fef9c3" />
-                    <stop offset="0.5" stopColor="#facc15" />
-                    <stop offset="1" stopColor="#a16207" />
-                  </radialGradient>
-                  <filter id="tcShadow" x="-40%" y="-40%" width="180%" height="180%">
-                    <feDropShadow dx="0" dy="1.2" stdDeviation="1" floodColor="#000" floodOpacity="0.5" />
-                  </filter>
-                </defs>
-                <g filter="url(#tcShadow)">
-                  <polygon points="5,23 19,23 12,15" fill="url(#tcVert)" />
-                  <rect x="10" y="1" width="4" height="21" rx="1.5" fill="url(#tcVert)" />
-                  <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill="url(#tcBar)" />
-                  <circle cx="12" cy="8.5" r="2.6" fill="url(#tcJewel)" stroke="#0f172a" strokeWidth="0.4" />
-                </g>
-              </svg>
+                <TruthPieceIcon className="h-[0.85em] w-[0.85em] shrink-0" />
               </span>
             </h1>
             <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
@@ -1880,14 +1999,7 @@ export default function Home() {
           </div>
           <p className="mt-3 text-sm sm:text-base text-stone-500 max-w-xl mx-auto text-center">
             On a ten×9 board with a piece that seeks Truth from the king{' '}
-            <span className="inline-flex align-middle mx-0.5" title="Truth piece">
-              <svg viewBox="0 0 24 24" width="16" height="16" style={{ display: 'inline-block' }}>
-                <polygon points="5,23 19,23 12,15" fill="#1f2937" />
-                <rect x="10" y="0" width="4" height="23" rx="1.5" fill="#1f2937" />
-                <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill="#1f2937" />
-                <circle cx="12" cy="8.5" r="2.6" fill="#facc15" />
-              </svg>
-            </span>
+            <TruthMarkInline />
             , flanking the King and Queen with a pawn in front. Truth moves like a Queen, captures opposing
             truth pieces and can put the king in Check. Conversely, the King can take the Truth.
           </p>
@@ -1989,6 +2101,52 @@ export default function Home() {
                     >
                       Resign
                     </Button>
+                  )}
+                  {mode === 'computer' && !gameOver && localMoves.length >= 2 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={requestTakeBack}
+                      className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                      Take back
+                    </Button>
+                  )}
+                  {mode === 'online' && onlineGame?.status === 'active' && myColor && !spectator && (onlineGame.moves || []).length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={requestTakeBack}
+                      disabled={!!onlineGame.take_back_offer_by}
+                      className="h-8 px-3 text-xs bg-white/90 backdrop-blur border-stone-300 justify-start gap-2"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                      Take back
+                    </Button>
+                  )}
+                  {mode === 'online' && onlineGame?.status === 'active' && onlineGame.take_back_offer_by && myColor && !spectator && (
+                    <div className="rounded-xl bg-amber-50 ring-1 ring-amber-300 p-2.5">
+                      {onlineGame.take_back_offer_by === myColor ? (
+                        <p className="text-[0.7rem] font-medium text-amber-800">
+                          Take back proposed — waiting for your opponent…
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-[0.7rem] font-semibold text-amber-800">
+                            Opponent proposes a take back
+                          </p>
+                          <div className="flex gap-1.5 mt-2">
+                            <Button size="sm" className="h-7 flex-1 text-xs" onClick={acceptTakeBackOnline}>
+                              Accept
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 flex-1 text-xs" onClick={declineTakeBackOnline}>
+                              Decline
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   )}
                   <Button
                     size="sm"
@@ -2147,29 +2305,7 @@ export default function Home() {
               />
             )}
 
-            {mode !== 'online' && (
-              <div className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-stone-200 shadow-sm p-5 sm:col-span-2 lg:col-span-3">
-                <p className="text-xs uppercase tracking-widest text-stone-400 mb-3">How to play</p>
-                <ul className="space-y-2 text-sm text-stone-600 leading-relaxed">
-                  <li>• Tap a piece to see its legal moves, then tap a highlighted square to move.</li>
-                  <li>• Standard chess rules apply on a 10-wide, 9-rank board, including castling and en passant.</li>
-                  <li>
-                    • <span className="font-medium text-stone-800">Truth</span> (the † cross piece) moves like a
-                    Queen. It captures only the opposing Truth, and can be captured only by the opposing King
-                    or an opposing Truth — otherwise it acts as a passive blocker. It controls the squares it
-                    slides to, so it can deliver check and checkmate. The Truth is free to move from the start, just like any other piece.
-                  </li>
-                  <li>• Pawns reaching the last rank promote (choose Q, R, B, N, or T for a Truth).</li>
-                  <li>• Draws are detected automatically at threefold repetition and the 50-move rule; use <span className="font-medium text-stone-800">Draw</span> to agree a draw, <span className="font-medium text-stone-800">Hint</span> for a suggested move, and <span className="font-medium text-stone-800">Copy moves</span> to export the game, or <span className="font-medium text-stone-800">Email moves</span> to send it to yourself.</li>
-                </ul>
-                <Link
-                  to="/learn"
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-600 hover:underline"
-                >
-                  Read the full guide →
-                </Link>
-              </div>
-            )}
+            {mode !== 'online' && <HowToPlay />}
           </aside>
         </div>
 
@@ -2227,50 +2363,7 @@ export default function Home() {
         onSubmit={importGame}
       />
 
-      {promo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[300px]">
-            <p className="text-center text-sm font-medium text-stone-600 mb-4">Promote pawn to:</p>
-            <div className="grid grid-cols-5 gap-2">
-              {['Q', 'R', 'B', 'N', 'T'].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => choosePromo(t)}
-                  className="aspect-square rounded-xl bg-stone-50 ring-1 ring-stone-200 hover:bg-amber-100 hover:ring-amber-400 transition flex items-center justify-center"
-                >
-                  {t === 'T' ? (
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-8 h-8"
-                      style={promo.color === 'w' ? { filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.55))' } : undefined}
-                    >
-                      <polygon points="5,23 19,23 12,15" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" strokeLinejoin="round" />
-                      <rect x="10" y="0" width="4" height="23" rx="1.5" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" />
-                      <rect x="4" y="6.5" width="16" height="4" rx="1.5" fill={promo.color === 'w' ? '#f8fafc' : '#1f2937'} stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.6" />
-                      <circle cx="12" cy="8.5" r="2.6" fill="#facc15" stroke={promo.color === 'w' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.2)'} strokeWidth="0.3" />
-                    </svg>
-                  ) : (
-                    <span
-                      className="leading-none"
-                      style={{
-                        fontSize: '2rem',
-                        color: promo.color === 'w' ? '#f8fafc' : '#1f2937',
-                        textShadow:
-                          promo.color === 'w'
-                            ? '0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.85)'
-                            : '0 1px 1px rgba(255,255,255,0.25)',
-                      }}
-                    >
-                      {GLYPHS[t]}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <PromotionDialog promo={promo} onChoose={choosePromo} />
 
       {pendingAdvance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">

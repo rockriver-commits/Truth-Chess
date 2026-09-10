@@ -1120,3 +1120,18 @@ export function bestMove(state, color, difficulty = 4, aggressiveMode = false, c
   if (!baseline) setPersistentBestMove(state, chosen);
   return chosen;
 }
+
+// Material balance from `color`'s perspective in centipawns (kings excluded).
+// Used by the UI for quick judgments like take-back requests: a computer more
+// than a pawn and a half behind on material is considered to be losing.
+export function materialBalance(state, color) {
+  let s = 0;
+  for (let r = 0; r < RANKS; r++) {
+    for (let f = 0; f < FILES; f++) {
+      const p = state.board[r][f];
+      if (!p || p.type === 'K') continue;
+      s += (p.color === color ? 1 : -1) * VALUES[p.type];
+    }
+  }
+  return s;
+}

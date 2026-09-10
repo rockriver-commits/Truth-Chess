@@ -95,6 +95,15 @@ export default function TruthGuide() {
         nearly impossible to remove, the Truth is active from the opening onward, shaping the center
         and delivering checks whenever an open line appears.
       </p>
+      <p className="mt-3 text-stone-600 leading-relaxed">
+        <strong>The Truth is not bound to one line or one square color.</strong> A bishop spends the entire
+        game on a single shade of square — put the wrong pawns in front of it and it may as well be a tall
+        pawn. The Truth has no such leash: because it slides along files, ranks, <em>and</em> diagonals, it
+        can switch lines whenever the position changes. When a diagonal closes, it swings to an open file;
+        when the center locks up, it relocates to the wing. That line-hopping freedom means the Truth can
+        never be buried the way a "bad bishop" can, it keeps generating fresh checks as the pawn structure
+        shifts, and it stays an active, dangerous piece from the opening all the way to the final mate.
+      </p>
 
       <H2>Special moves: castling, en passant, promotion</H2>
       <p className="mt-3 text-stone-600 leading-relaxed">

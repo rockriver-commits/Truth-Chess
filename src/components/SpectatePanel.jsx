@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import MiniBoard from '@/components/MiniBoard';
+import { replayStates } from '@/lib/onlineGame';
 
 function todayKey() {
   const d = new Date();
@@ -11,12 +13,11 @@ function todayLabel() {
   return new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// Always-visible "watch live games" panel. Shown on the home page in every
-// mode so anyone can spectate an active game at any time — even while playing
-// a local or computer game. Lists active, non-ghost games the viewer isn't
-// already part of; empty state offers a manual refresh with a spinning icon
-// so it's obvious the refresh is working even when no games are live.
-export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh }) {
+// Always-visible "watch live games" panel. Each active game is shown as a tiny
+// live board — small enough to fit several on the page — and clicking one
+// opens that game as a spectator in a new tab, so watching never interrupts
+// what you were doing.
+export default function SpectatePanel({ activeGames, myId, onRefresh }) {
   const [refreshing, setRefreshing] = useState(false);
   const [dailyCount, setDailyCount] = useState(null);
   const [dailyDate] = useState(todayLabel);
@@ -45,6 +46,20 @@ export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh })
     return g.white_player_id !== myId && g.black_player_id !== myId;
   });
 
+  // Latest position of a live game, as a tiny board diagram.
+  function boardFor(g) {
+    try {
+      const positions = replayStates(g.moves || []);
+      return positions[positions.length - 1]?.state?.board || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function openInNewTab(g) {
+    window.open(`${window.location.origin}/?watch=${g.code}`, '_blank');
+  }
+
   async function handleRefresh() {
     if (refreshing) return;
     setRefreshing(true);
@@ -63,23 +78,31 @@ export default function SpectatePanel({ activeGames, myId, onWatch, onRefresh })
         <div className="h-px bg-stone-200 flex-1" />
       </div>
       {watchable.length > 0 ? (
-        <div className="space-y-2">
-          {watchable.map((g) => (
-            <div
-              key={g.id}
-              className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2"
-            >
-              <span className="flex items-baseline gap-2 min-w-0">
-                <span className="font-mono text-sm tracking-widest text-stone-700">{g.code}</span>
-                {g.black_player_id === '__computer__' && (
-                  <span className="text-[0.65rem] uppercase tracking-wide text-amber-600 shrink-0">vs Computer</span>
+        <div className="grid grid-cols-2 gap-2">
+          {watchable.slice(0, 6).map((g) => {
+            const board = boardFor(g);
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => openInNewTab(g)}
+                title={`Watch game ${g.code} in a new tab`}
+                className="flex flex-col items-center gap-1 rounded-xl bg-stone-50 ring-1 ring-stone-200 hover:ring-amber-400 transition p-2"
+              >
+                {board ? (
+                  <MiniBoard board={board} square={18} />
+                ) : (
+                  <div className="w-[192px] h-[174px] rounded-md bg-amber-50 ring-1 ring-stone-300" />
                 )}
-              </span>
-              <Button size="sm" variant="outline" onClick={() => onWatch(g)}>
-                Watch
-              </Button>
-            </div>
-          ))}
+                <span className="font-mono text-[0.6rem] tracking-widest text-stone-600 max-w-full truncate">
+                  {g.code}
+                  {g.black_player_id === '__computer__' && (
+                    <span className="text-amber-600"> · vs Computer</span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="flex items-center justify-between rounded-xl bg-stone-50 ring-1 ring-stone-200 px-3 py-2">

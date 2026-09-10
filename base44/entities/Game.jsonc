@@ -93,6 +93,14 @@
         "b"
       ]
     },
+    "take_back_offer_by": {
+      "type": "string",
+      "enum": [
+        "w",
+        "b"
+      ],
+      "description": "Color of the player proposing to take back the last move; cleared when accepted, declined, or a new move is played."
+    },
     "last_move_at": {
       "type": "string",
       "format": "date-time"
