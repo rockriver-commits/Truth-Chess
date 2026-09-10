@@ -92,10 +92,13 @@ export default async function(req) {
       (email ? `Reply email: ${email}\n` : "") +
       "\nMessage:\n" + message + "\n";
 
+    // Plain-text body: user-supplied name/email/message are inserted into the
+    // email as literal text, never as HTML, so a crafted comment can't render
+    // markup (tracking pixels, spoofed links) in the owner's mail client.
     await base44.asServiceRole.integrations.Core.SendEmail({
       to: toEmail,
       subject,
-      body: emailBody,
+      text: emailBody,
       from_name: "Truth Chess Feedback",
     });
 
