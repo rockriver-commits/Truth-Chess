@@ -238,6 +238,12 @@ export default function Home() {
 
   // online
   const [me, setMe] = useState(null);
+  // True once the sign-in check has finished either way (logged in or guest).
+  // Online games must not be created or joined before this resolves: while the
+  // check is pending the player is treated as a guest, so the game record would
+  // store a temporary guest id — and once the real account loads, that player
+  // is no longer recognized as White/Black (can't move, no take-back button).
+  const [authReady, setAuthReady] = useState(false);
   const [onlineGame, setOnlineGame] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [onlineError, setOnlineError] = useState('');
@@ -252,7 +258,8 @@ export default function Home() {
   useEffect(() => {
     base44.auth.me()
       .then((u) => { setMe(u); })
-      .catch(() => { setMe(null); });
+      .catch(() => { setMe(null); })
+      .finally(() => setAuthReady(true));
   }, []);
 
   useEffect(() => {
@@ -837,6 +844,10 @@ export default function Home() {
 
   async function createOnline() {
     setOnlineError('');
+    if (!authReady) {
+      setOnlineError('Signing you in — try again in a moment.');
+      return;
+    }
     try {
       if (!requirePro()) return;
       const code = generateCode();
@@ -863,6 +874,10 @@ export default function Home() {
 
   async function joinOnline(code) {
     setOnlineError('');
+    if (!authReady) {
+      setOnlineError('Signing you in — try again in a moment.');
+      return;
+    }
     try {
       if (!requirePro()) return;
       const found = await base44.entities.Game.filter({
@@ -1185,6 +1200,10 @@ export default function Home() {
 
   async function quickMatch() {
     setOnlineError('');
+    if (!authReady) {
+      setOnlineError('Signing you in — try again in a moment.');
+      return;
+    }
     if (!requirePro()) return;
     try {
       const open = await base44.entities.Game.filter({ status: 'waiting' }, 'created_date', 50);
@@ -1209,6 +1228,10 @@ export default function Home() {
 
   async function joinSpecific(game) {
     setOnlineError('');
+    if (!authReady) {
+      setOnlineError('Signing you in — try again in a moment.');
+      return;
+    }
     if (game.white_player_id === identity.id) {
       setOnlineError('That is your own game.');
       return;
@@ -1245,6 +1268,10 @@ export default function Home() {
 
   async function startGhost() {
     setOnlineError('');
+    if (!authReady) {
+      setOnlineError('Signing you in — try again in a moment.');
+      return;
+    }
     if (!requirePro()) return;
     try {
       const code = generateCode();
